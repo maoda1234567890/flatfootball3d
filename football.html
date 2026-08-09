@@ -1,0 +1,1568 @@
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>躺平足球3D - FlatFootball3D</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; background: #111; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+  canvas { display: block; }
+  #ui {
+    position: fixed; top: 0; left: 0; width: 100%; pointer-events: none; z-index: 10;
+    display: flex; justify-content: center; padding: 12px;
+  }
+  #scoreboard {
+    display: flex; gap: 16px; align-items: center;
+    background: rgba(0,0,0,0.7); padding: 8px 28px; border-radius: 12px;
+    color: #fff; font-size: 16px; font-weight: bold;
+    backdrop-filter: blur(6px);
+  }
+  .team1 { color: #4fc3f7; } .team2 { color: #ef5350; }
+  .score { font-size: 28px; } .vs { color: #ffd54f; font-size: 18px; }
+  #goalMsg {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 72px; font-weight: bold; color: #ffd54f;
+    text-shadow: 0 0 40px rgba(255,213,79,0.8), 0 4px 12px rgba(0,0,0,0.6);
+    pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 20;
+  }
+  #goalMsg.show { opacity: 1; }
+  #controls {
+    position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 20px; color: rgba(255,255,255,0.6); font-size: 11px;
+    pointer-events: none; z-index: 10; flex-wrap: wrap; justify-content: center;
+  }
+  .ctrl { background: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 6px; }
+  kbd { background: rgba(255,255,255,0.15); border-radius: 3px; padding: 1px 4px; }
+  #startMsg {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 26px; color: #fff; text-align: center;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.6); pointer-events: none; z-index: 20;
+  }
+  #victoryOverlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    display: none; z-index: 50; pointer-events: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.5);
+  }
+  #victoryOverlay.show { display: flex; }
+  #victoryText {
+    font-size: 80px; font-weight: bold;
+    text-shadow: 0 0 60px rgba(255,213,79,0.9), 0 6px 20px rgba(0,0,0,0.8);
+    animation: victoryPulse 0.5s ease-in-out infinite alternate;
+  }
+  @keyframes victoryPulse { from { transform: scale(1); } to { transform: scale(1.1); } }
+  #victorySub { font-size: 24px; color: #fff; margin-top: 20px; text-shadow: 0 2px 8px rgba(0,0,0,0.6); }
+  #victoryRestart { margin-top: 30px; font-size: 18px; color: rgba(255,255,255,0.6); }
+  #powerupMsg {
+    position: fixed; top: 60%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 28px; font-weight: bold; pointer-events: none; opacity: 0;
+    transition: opacity 0.3s; z-index: 20; text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+  #powerupMsg.show { opacity: 1; }
+  #buffLeft, #buffRight {
+    position: fixed; top: 60px; pointer-events: none; z-index: 10;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  #buffLeft { left: 12px; } #buffRight { right: 12px; }
+  .buff-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .buff-icon {
+    width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center;
+    justify-content: center; font-size: 18px; background: rgba(0,0,0,0.7);
+    position: relative; overflow: hidden;
+  }
+  .buff-icon .fill {
+    position: absolute; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.2);
+    transition: height 0.1s;
+  }
+  .buff-icon span { position: relative; z-index: 1; }
+  .ammo-count { position: absolute; bottom: -1px; right: 1px; font-size: 9px; color: #fff; z-index: 2; text-shadow: 0 0 2px #000; }
+  .buff-label { color: rgba(255,255,255,0.7); font-size: 12px; font-weight: bold; text-align: center; margin-bottom: 2px; }
+  #respawnBar {
+    position: fixed; top: 48px; left: 0; width: 100%; pointer-events: none; z-index: 12;
+    display: flex; justify-content: center; gap: 20px;
+  }
+  .respawn-tag { font-size: 18px; font-weight: bold; padding: 2px 12px; border-radius: 6px; background: rgba(0,0,0,0.6); }
+</style>
+</head>
+<body>
+<div id="ui">
+  <div id="scoreboard">
+    <span class="team1">🔵 P1 <span class="score" id="s1">0</span> <span id="k1" style="font-size:12px;color:#aaa">0</span>杀</span>
+    <span class="vs">VS</span>
+    <span class="team2"><span id="k2" style="font-size:12px;color:#aaa">0</span>杀 <span class="score" id="s2">0</span> P2 🔴</span>
+  </div>
+</div>
+<div id="goalMsg">GOAL!</div>
+<div id="powerupMsg"></div>
+<div id="buffLeft"><div class="buff-label" style="color:#4fc3f7">P1</div></div>
+<div id="buffRight"><div class="buff-label" style="color:#ef5350">P2</div></div>
+<div id="respawnBar"></div>
+<div id="startMsg">按任意键开始</div>
+<div id="victoryOverlay"><div id="victoryText"></div><div id="victorySub"></div><div id="victoryRestart">按 P 重新开始</div></div>
+<div id="controls">
+  <div class="ctrl"><b style="color:#4fc3f7">P1</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>爬行 <kbd>J</kbd>左腿 <kbd>K</kbd>右腿 <kbd>Space</kbd>使用道具 <kbd>E</kbd>冲锋枪 <kbd>Q</kbd>狙击枪 <kbd>R</kbd>手雷</div>
+  <div class="ctrl"><b style="color:#ef5350">P2</b> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>爬行 <kbd>1</kbd>左腿 <kbd>2</kbd>右腿 <kbd>/</kbd>使用道具 <kbd>.</kbd>冲锋枪 <kbd>,</kbd>狙击枪 <kbd>0</kbd>手雷</div>
+</div>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+// ===== 常量 =====
+const BALL_R = 0.4;
+const PLAYER_R = 0.7, PLAYER_H = 0.4;
+const LEG_LEN = 0.9;
+const GRAVITY = -15;
+const MOVE_SPEED = 28;
+const KICK_FORCE = 25;
+const BALL_FRIC = 0.992;
+const BALL_GROUND_FRIC = 0.982;
+const PLAYER_FRIC = 0.93;
+const KNOCKBACK = 18;
+const MAGNUS_FACTOR = 0.15;
+const WRIGGLE_SPEED = 10;
+const RESPAWN_TIME = 5;
+const INVINCIBLE_TIME = 3;
+const MAX_HP = 100;
+const BOUNCE_MAX = 1023;
+const WIN_SCORE = 11;
+const GOAL_W = 4, GOAL_H = 2.5, GOAL_D = 1.5;
+
+// 伤害值
+const DMG_GUN = 3;
+const DMG_SNIPER = 80;
+const DMG_ROCKET = 100;
+const DMG_GRENADE = 200;
+const DMG_BOMB = 100;
+const DMG_ZAP = 100;
+const DMG_NUKE = 999;
+
+// ===== 随机封闭场地 =====
+const NUM_SIDES = 7 + Math.floor(Math.random() * 5); // 7-11边
+const BASE_RADIUS = 26; // 面积约3倍
+const fieldVerts = []; // {x, z}
+const fieldEdges = []; // {ax,az,bx,bz,nx,nz,dx,dz,len,lenSq,isGoal,goalTeam,goalT1,goalT2}
+const goalSegments = []; // {edgeIdx, t1, t2, team, cx, cz, onx, onz} — 独立球门段
+
+function generateField() {
+  const angles = [];
+  for (let i = 0; i < NUM_SIDES; i++) angles.push((i / NUM_SIDES) * Math.PI * 2 + (Math.random() - 0.5) * 0.3);
+  angles.sort((a, b) => a - b);
+  for (let i = 0; i < NUM_SIDES; i++) {
+    const r = BASE_RADIUS * (0.75 + Math.random() * 0.5);
+    fieldVerts.push({ x: Math.cos(angles[i]) * r, z: Math.sin(angles[i]) * r });
+  }
+  // 计算面积并缩放到目标
+  let area = 0;
+  for (let i = 0; i < NUM_SIDES; i++) {
+    const j = (i + 1) % NUM_SIDES;
+    area += fieldVerts[i].x * fieldVerts[j].z - fieldVerts[j].x * fieldVerts[i].z;
+  }
+  area = Math.abs(area) / 2;
+  const targetArea = 1620;
+  const scale = Math.sqrt(targetArea / area);
+  for (const v of fieldVerts) { v.x *= scale; v.z *= scale; }
+}
+
+function computeEdges() {
+  fieldEdges.length = 0; goalSegments.length = 0;
+  for (let i = 0; i < NUM_SIDES; i++) {
+    const j = (i + 1) % NUM_SIDES;
+    const a = fieldVerts[i], b = fieldVerts[j];
+    const dx = b.x - a.x, dz = b.z - a.z;
+    const len = Math.sqrt(dx * dx + dz * dz);
+    const nx = -dz / len, nz = dx / len;
+    fieldEdges.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, nx, nz, dx: dx / len, dz: dz / len, len, lenSq: len * len, isGoal: false, goalTeam: 0, goalT1: 0, goalT2: 0 });
+  }
+  // 随机2-100个球门，沿周长均匀分布（允许同一位置有多个球门）
+  const NUM_GOALS = 2 + Math.floor(Math.random() * 99);
+  const totalPerimeter = fieldEdges.reduce((s, e) => s + e.len, 0);
+  const GOAL_W_ABS = Math.min(GOAL_W, totalPerimeter / (NUM_GOALS * 3));
+  for (let gi = 0; gi < NUM_GOALS; gi++) {
+    const perimeterPos = (gi + 0.5) / NUM_GOALS * totalPerimeter;
+    // 找到对应的边
+    let accum = 0, edgeIdx = 0, t = 0;
+    for (let ei = 0; ei < NUM_SIDES; ei++) {
+      if (accum + fieldEdges[ei].len > perimeterPos) { edgeIdx = ei; t = (perimeterPos - accum) / fieldEdges[ei].len; break; }
+      accum += fieldEdges[ei].len;
+      if (ei === NUM_SIDES - 1) { edgeIdx = ei; t = 0.5; }
+    }
+    const edge = fieldEdges[edgeIdx];
+    const halfW = (GOAL_W_ABS / 2) / edge.len;
+    const t1 = Math.max(0.02, t - halfW), t2 = Math.min(0.98, t + halfW);
+    if (t2 - t1 < 0.04) continue; // 太小跳过
+    const team = (gi % 2) + 1; // 交替分配队伍
+    const cx = edge.ax + edge.dx * edge.len * ((t1 + t2) / 2);
+    const cz = edge.az + edge.dz * edge.len * ((t1 + t2) / 2);
+    const onx = -edge.nx, onz = -edge.nz; // 外法线
+    goalSegments.push({ edgeIdx, t1, t2, team, cx, cz, onx, onz });
+    edge.isGoal = true; // 标记边含球门
+  }
+  // 允许重叠：额外随机复制一些球门到已有位置（不同队伍）
+  const overlapCount = Math.floor(NUM_GOALS * 0.3);
+  for (let oi = 0; oi < overlapCount; oi++) {
+    const src = goalSegments[Math.floor(Math.random() * goalSegments.length)];
+    const flipTeam = src.team === 1 ? 2 : 1;
+    goalSegments.push({ ...src, team: flipTeam });
+  }
+}
+
+function isInsidePolygon(x, z) {
+  for (const e of fieldEdges) {
+    if ((x - e.ax) * e.nx + (z - e.az) * e.nz < 0) return false;
+  }
+  return true;
+}
+
+function signedDistToEdge(x, z, e) {
+  return (x - e.ax) * e.nx + (z - e.az) * e.nz;
+}
+
+function projectOnEdge(x, z, e) {
+  return ((x - e.ax) * e.dx + (z - e.az) * e.dz) / e.len;
+}
+
+function constrainToField(x, z, radius) {
+  for (let iter = 0; iter < 3; iter++) {
+    for (const e of fieldEdges) {
+      const sd = signedDistToEdge(x, z, e);
+      if (sd < radius) {
+        x += e.nx * (radius - sd);
+        z += e.nz * (radius - sd);
+      }
+    }
+  }
+  return { x, z };
+}
+
+generateField();
+computeEdges();
+
+// ===== 渲染器 =====
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const fieldHue = 0.25 + Math.random() * 0.12;
+const fieldBaseColor = new THREE.Color().setHSL(fieldHue, 0.5 + Math.random() * 0.3, 0.15 + Math.random() * 0.15);
+scene.background = fieldBaseColor.clone().multiplyScalar(0.6);
+scene.fog = new THREE.Fog(scene.background, 50, 90);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 150);
+camera.position.set(0, 35, 35);
+camera.lookAt(0, 0, 0);
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ===== 灯光 =====
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const dir = new THREE.DirectionalLight(0xfff5e0, 1.2);
+dir.position.set(8, 25, 10);
+dir.castShadow = true;
+dir.shadow.mapSize.set(2048, 2048);
+dir.shadow.camera.left = -30; dir.shadow.camera.right = 30;
+dir.shadow.camera.top = 25; dir.shadow.camera.bottom = -25;
+scene.add(dir);
+
+// ===== 场地网格 =====
+const fieldShape = new THREE.Shape();
+fieldShape.moveTo(fieldVerts[0].x, fieldVerts[0].z);
+for (let i = 1; i < NUM_SIDES; i++) fieldShape.lineTo(fieldVerts[i].x, fieldVerts[i].z);
+fieldShape.closePath();
+const fieldGeo = new THREE.ShapeGeometry(fieldShape);
+const fieldMesh = new THREE.Mesh(fieldGeo, new THREE.MeshStandardMaterial({ color: fieldBaseColor, roughness: 0.9 }));
+fieldMesh.rotation.x = -Math.PI / 2; fieldMesh.receiveShadow = true; scene.add(fieldMesh);
+
+// 条纹
+for (let i = 0; i < NUM_SIDES; i++) {
+  const v = fieldVerts[i], vn = fieldVerts[(i + 1) % NUM_SIDES];
+  const mx = (v.x + vn.x) / 2, mz = (v.z + vn.z) / 2;
+  if (i % 2 === 0) {
+    const stripe = new THREE.Mesh(new THREE.PlaneGeometry(vn.x === v.x ? 1 : Math.abs(vn.x - v.x) * 0.3, Math.sqrt((vn.x - v.x) ** 2 + (vn.z - v.z) ** 2)),
+      new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(fieldHue, 0.5, 0.13 + Math.random() * 0.05), roughness: 0.9 }));
+    stripe.rotation.x = -Math.PI / 2;
+    stripe.position.set(mx * 0.5, 0.01, mz * 0.5);
+    stripe.receiveShadow = true;
+    scene.add(stripe);
+  }
+}
+
+// ===== 白色描边 =====
+const outlinePts = fieldVerts.map(v => new THREE.Vector3(v.x, 0.05, v.z));
+outlinePts.push(outlinePts[0].clone());
+const outlineLine = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(outlinePts),
+  new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 })
+);
+scene.add(outlineLine);
+// 加粗描边 - 用管道
+const outlineCurve = new THREE.CatmullRomCurve3(outlinePts.slice(0, -1).map(p => new THREE.Vector3(p.x, 0.1, p.z)), true);
+const tubeGeo = new THREE.TubeGeometry(outlineCurve, NUM_SIDES * 4, 0.12, 6, true);
+const tubeMesh = new THREE.Mesh(tubeGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 }));
+tubeMesh.castShadow = true; scene.add(tubeMesh);
+
+// 中心白色圆圈
+const CENTER_CIRCLE_R = 5;
+const centerCircleGeo = new THREE.TorusGeometry(CENTER_CIRCLE_R, 0.1, 8, 48);
+const centerCircleMesh = new THREE.Mesh(centerCircleGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 }));
+centerCircleMesh.rotation.x = -Math.PI / 2; centerCircleMesh.position.y = 0.05; centerCircleMesh.castShadow = true;
+scene.add(centerCircleMesh);
+
+// ===== 球门（足球门样式：横梁+立柱+网）=====
+function makePolygonGoal(gs) {
+  const edge = fieldEdges[gs.edgeIdx];
+  const g = new THREE.Group();
+  const teamColor = gs.team === 1 ? 0x4fc3f7 : 0xef5350;
+  const postMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.8, roughness: 0.2 });
+  const netMat = new THREE.MeshStandardMaterial({ color: teamColor, transparent: true, opacity: 0.2, side: THREE.DoubleSide, wireframe: true });
+  const netSolidMat = new THREE.MeshStandardMaterial({ color: teamColor, transparent: true, opacity: 0.08, side: THREE.DoubleSide });
+  const t1 = gs.t1 * edge.len, t2 = gs.t2 * edge.len;
+  const goalLen = t2 - t1;
+  const gx1 = edge.ax + edge.dx * t1, gz1 = edge.az + edge.dz * t1;
+  const gx2 = edge.ax + edge.dx * t2, gz2 = edge.az + edge.dz * t2;
+  const onx = gs.onx, onz = gs.onz;
+  const postR = 0.08;
+
+  // 左立柱
+  const leftPost = new THREE.Mesh(new THREE.CylinderGeometry(postR, postR, GOAL_H, 8), postMat);
+  leftPost.position.set(gx1, GOAL_H / 2, gz1); leftPost.castShadow = true; g.add(leftPost);
+  // 左立柱顶球
+  const leftCap = new THREE.Mesh(new THREE.SphereGeometry(postR * 1.5, 8, 8), postMat);
+  leftCap.position.set(gx1, GOAL_H, gz1); g.add(leftCap);
+
+  // 右立柱
+  const rightPost = new THREE.Mesh(new THREE.CylinderGeometry(postR, postR, GOAL_H, 8), postMat);
+  rightPost.position.set(gx2, GOAL_H / 2, gz2); rightPost.castShadow = true; g.add(rightPost);
+  // 右立柱顶球
+  const rightCap = new THREE.Mesh(new THREE.SphereGeometry(postR * 1.5, 8, 8), postMat);
+  rightCap.position.set(gx2, GOAL_H, gz2); g.add(rightCap);
+
+  // 横梁
+  const barCx = (gx1 + gx2) / 2, barCz = (gz1 + gz2) / 2;
+  const barAngle = Math.atan2(gz2 - gz1, gx2 - gx1);
+  const crossbar = new THREE.Mesh(new THREE.CylinderGeometry(postR, postR, goalLen, 8), postMat);
+  crossbar.rotation.z = Math.PI / 2;
+  crossbar.rotation.y = -barAngle + Math.PI / 2;
+  crossbar.position.set(barCx, GOAL_H, barCz); crossbar.castShadow = true; g.add(crossbar);
+
+  // 后框 - 两根后立柱 + 后横梁
+  const backLeftX = gx1 + onx * GOAL_D, backLeftZ = gz1 + onz * GOAL_D;
+  const backRightX = gx2 + onx * GOAL_D, backRightZ = gz2 + onz * GOAL_D;
+  const backBarCx = barCx + onx * GOAL_D, backBarCz = barCz + onz * GOAL_D;
+
+  // 后左立柱
+  const blPost = new THREE.Mesh(new THREE.CylinderGeometry(postR * 0.7, postR * 0.7, GOAL_H, 8), postMat);
+  blPost.position.set(backLeftX, GOAL_H / 2, backLeftZ); g.add(blPost);
+  // 后右立柱
+  const brPost = new THREE.Mesh(new THREE.CylinderGeometry(postR * 0.7, postR * 0.7, GOAL_H, 8), postMat);
+  brPost.position.set(backRightX, GOAL_H / 2, backRightZ); g.add(brPost);
+  // 后横梁
+  const backBar = new THREE.Mesh(new THREE.CylinderGeometry(postR * 0.7, postR * 0.7, goalLen, 8), postMat);
+  backBar.rotation.z = Math.PI / 2;
+  backBar.rotation.y = -barAngle + Math.PI / 2;
+  backBar.position.set(backBarCx, GOAL_H, backBarCz); g.add(backBar);
+
+  // 顶部连接梁（左前→左后、右前→右后）
+  const topLeftBar = new THREE.Mesh(new THREE.CylinderGeometry(postR * 0.5, postR * 0.5, GOAL_D, 8), postMat);
+  const tlp = new THREE.Vector3(gx1, GOAL_H, gz1);
+  const tlp2 = new THREE.Vector3(backLeftX, GOAL_H, backLeftZ);
+  topLeftBar.position.copy(tlp.clone().add(tlp2).multiplyScalar(0.5));
+  const tlDir = tlp2.clone().sub(tlp);
+  topLeftBar.lookAt(tlp2);
+  topLeftBar.rotateX(Math.PI / 2);
+  g.add(topLeftBar);
+
+  const topRightBar = new THREE.Mesh(new THREE.CylinderGeometry(postR * 0.5, postR * 0.5, GOAL_D, 8), postMat);
+  const trp = new THREE.Vector3(gx2, GOAL_H, gz2);
+  const trp2 = new THREE.Vector3(backRightX, GOAL_H, backRightZ);
+  topRightBar.position.copy(trp.clone().add(trp2).multiplyScalar(0.5));
+  topRightBar.lookAt(trp2);
+  topRightBar.rotateX(Math.PI / 2);
+  g.add(topRightBar);
+
+  // 网 - 后面
+  const backNet = new THREE.Mesh(new THREE.PlaneGeometry(goalLen, GOAL_H, Math.ceil(goalLen), Math.ceil(GOAL_H)), netMat);
+  backNet.position.set(backBarCx, GOAL_H / 2, backBarCz);
+  backNet.rotation.y = Math.atan2(onz, onx); g.add(backNet);
+  // 网 - 后面半透明填充
+  const backSolid = new THREE.Mesh(new THREE.PlaneGeometry(goalLen, GOAL_H), netSolidMat);
+  backSolid.position.set(backBarCx, GOAL_H / 2, backBarCz);
+  backSolid.rotation.y = Math.atan2(onz, onx); g.add(backSolid);
+
+  // 网 - 顶面
+  const topNet = new THREE.Mesh(new THREE.PlaneGeometry(goalLen, GOAL_D, Math.ceil(goalLen), Math.ceil(GOAL_D)), netMat);
+  topNet.rotation.x = -Math.PI / 2;
+  const topCx = barCx + onx * GOAL_D / 2, topCz = barCz + onz * GOAL_D / 2;
+  topNet.position.set(topCx, GOAL_H, topCz);
+  topNet.rotation.y = -barAngle + Math.PI / 2;
+  // 旋转顶面网使其对齐
+  topNet.rotation.set(-Math.PI / 2, -barAngle + Math.PI / 2, 0);
+  topNet.position.set(topCx, GOAL_H, topCz);
+  g.add(topNet);
+
+  // 网 - 左侧面
+  const sideLenL = GOAL_D;
+  const leftNet = new THREE.Mesh(new THREE.PlaneGeometry(sideLenL, GOAL_H, Math.ceil(sideLenL), Math.ceil(GOAL_H)), netMat);
+  const lncx = (gx1 + backLeftX) / 2, lncz = (gz1 + backLeftZ) / 2;
+  leftNet.position.set(lncx, GOAL_H / 2, lncz);
+  leftNet.rotation.y = Math.atan2(onz, onx) + Math.PI / 2;
+  g.add(leftNet);
+
+  // 网 - 右侧面
+  const rightNet = new THREE.Mesh(new THREE.PlaneGeometry(sideLenL, GOAL_H, Math.ceil(sideLenL), Math.ceil(GOAL_H)), netMat);
+  const rncx = (gx2 + backRightX) / 2, rncz = (gz2 + backRightZ) / 2;
+  rightNet.position.set(rncx, GOAL_H / 2, rncz);
+  rightNet.rotation.y = Math.atan2(onz, onx) - Math.PI / 2;
+  g.add(rightNet);
+
+  // 球门区域发光标记（地面）
+  const floorMark = new THREE.Mesh(new THREE.PlaneGeometry(goalLen, GOAL_D),
+    new THREE.MeshBasicMaterial({ color: teamColor, transparent: true, opacity: 0.1, side: THREE.DoubleSide }));
+  floorMark.rotation.x = -Math.PI / 2;
+  floorMark.rotation.z = -barAngle + Math.PI / 2;
+  floorMark.position.set(barCx + onx * GOAL_D / 2, 0.02, barCz + onz * GOAL_D / 2);
+  g.add(floorMark);
+
+  scene.add(g);
+}
+for (const gs of goalSegments) makePolygonGoal(gs);
+console.log(`球门数量: ${goalSegments.length}`);
+
+// ===== 多球系统 =====
+const balls = [];
+const MAX_BALLS = 40;
+const CENTER_CIRCLE_R_REF = () => CENTER_CIRCLE_R;
+
+// 球皮肤类型
+const BALL_SKINS = ['football', 'basketball', 'tennis', 'volleyball', 'badminton'];
+
+function createBallMesh(radius, skinType) {
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(radius, 20, 20), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4, metalness: 0.1 }));
+  ball.castShadow = true; ball.position.y = radius + 0.05;
+
+  if (skinType === 'football') {
+    // 足球花纹 - 12个黑色五边形
+    const pentGeo = new THREE.CircleGeometry(radius * 0.22, 5);
+    const pentMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+    const golden = (1 + Math.sqrt(5)) / 2;
+    for (let i = 0; i < 12; i++) {
+      const theta = Math.acos(1 - 2 * (i + 0.5) / 12);
+      const phi = 2 * Math.PI * i / golden;
+      const p = new THREE.Mesh(pentGeo, pentMat);
+      p.position.setFromSphericalCoords(radius * 1.002, theta, phi);
+      p.lookAt(0, 0, 0);
+      ball.add(p);
+    }
+    // 黑色线条
+    const lineGeo = new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(radius * 0.99, 1));
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x333333 });
+    ball.add(new THREE.LineSegments(lineGeo, lineMat));
+  } else if (skinType === 'basketball') {
+    // 篮球 - 橙色底+黑色线
+    ball.material.color.setHex(0xff8c00);
+    ball.material.roughness = 0.7;
+    // 横线
+    const hLine = new THREE.Mesh(new THREE.TorusGeometry(radius * 1.001, radius * 0.02, 4, 32), new THREE.MeshBasicMaterial({ color: 0x222222 }));
+    ball.add(hLine);
+    // 竖线
+    const vLine = new THREE.Mesh(new THREE.TorusGeometry(radius * 1.001, radius * 0.02, 4, 32), new THREE.MeshBasicMaterial({ color: 0x222222 }));
+    vLine.rotation.y = Math.PI / 2; ball.add(vLine);
+    // 侧弯线
+    const sLine = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.7, radius * 0.02, 4, 32), new THREE.MeshBasicMaterial({ color: 0x222222 }));
+    sLine.position.z = radius * 0.7; ball.add(sLine);
+    const sLine2 = sLine.clone(); sLine2.position.z = -radius * 0.7; ball.add(sLine2);
+  } else if (skinType === 'tennis') {
+    // 网球 - 荧光绿+白色弯线
+    ball.material.color.setHex(0xc8e620);
+    ball.material.roughness = 0.6;
+    const curve1 = new THREE.Mesh(new THREE.TorusGeometry(radius * 1.001, radius * 0.025, 4, 32), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    curve1.rotation.x = 0.3; ball.add(curve1);
+    const curve2 = new THREE.Mesh(new THREE.TorusGeometry(radius * 1.001, radius * 0.025, 4, 32), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    curve2.rotation.x = -0.3; curve2.rotation.z = Math.PI / 2; ball.add(curve2);
+  } else if (skinType === 'volleyball') {
+    // 排球 - 白色底+蓝黄红线条
+    ball.material.color.setHex(0xf5f5f5);
+    const vColors = [0x1565c0, 0xffc107, 0xe53935];
+    for (let vi = 0; vi < 3; vi++) {
+      const vLine = new THREE.Mesh(new THREE.TorusGeometry(radius * 1.001, radius * 0.025, 4, 32), new THREE.MeshBasicMaterial({ color: vColors[vi] }));
+      vLine.rotation.set(vi * 0.5, vi * 0.7, vi * 0.3);
+      ball.add(vLine);
+    }
+  } else if (skinType === 'badminton') {
+    // 羽毛球 - 白色底+V形线条(模拟羽毛)
+    ball.material.color.setHex(0xf8f8f0);
+    ball.material.roughness = 0.3;
+    // 顶部圆环
+    const topRing = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.5, radius * 0.03, 4, 16), new THREE.MeshBasicMaterial({ color: 0xdddddd }));
+    topRing.position.y = radius * 0.6; topRing.rotation.x = Math.PI / 2; ball.add(topRing);
+    // 放射线
+    for (let bi = 0; bi < 8; bi++) {
+      const a = (bi / 8) * Math.PI * 2;
+      const spoke = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.01, radius * 0.01, radius * 1.2, 4), new THREE.MeshBasicMaterial({ color: 0xcccccc }));
+      spoke.position.set(Math.cos(a) * radius * 0.3, 0, Math.sin(a) * radius * 0.3);
+      spoke.rotation.set(0.3, a, Math.PI / 2); ball.add(spoke);
+    }
+  }
+
+  scene.add(ball);
+  return ball;
+}
+
+function createBallState() {
+  return { vx: 0, vy: 0, vz: 0, spinX: 0, spinY: 0, spinZ: 0, stuckTimer: 0, lastX: 0, lastZ: 0, lastTouch: null };
+}
+
+function randomBallRadius() {
+  return 0.2 + Math.random() * 0.5; // 0.2 ~ 0.7
+}
+function randomBallSkin() {
+  return BALL_SKINS[Math.floor(Math.random() * BALL_SKINS.length)];
+}
+
+function initMainBall() {
+  const radius = BALL_R;
+  const skin = randomBallSkin();
+  const mesh = createBallMesh(radius, skin);
+  const state = createBallState();
+  balls.push({ mesh, state, isMain: true, _radius: radius, _skin: skin });
+}
+initMainBall();
+
+function spawnExtraBall() {
+  if (balls.length >= MAX_BALLS) return;
+  const radius = randomBallRadius();
+  const skin = randomBallSkin();
+  const mesh = createBallMesh(radius, skin);
+  const angle = Math.random() * Math.PI * 2;
+  const r = Math.random() * (CENTER_CIRCLE_R * 0.5);
+  mesh.position.set(Math.cos(angle) * r, radius + 0.05, Math.sin(angle) * r);
+  const state = createBallState();
+  state.vx = (Math.random() - 0.5) * 10; state.vz = (Math.random() - 0.5) * 10;
+  balls.push({ mesh, state, isMain: false, _radius: radius, _skin: skin });
+  showPowerupMsg('⚽ 多球!', 0xffffff);
+}
+
+function resetBall(ball) {
+  // 回到中心圆圈内的随机位置
+  const angle = Math.random() * Math.PI * 2;
+  const r = Math.random() * (CENTER_CIRCLE_R * 0.6);
+  ball.mesh.position.set(Math.cos(angle) * r, ball._radius + 0.05, Math.sin(angle) * r);
+  Object.assign(ball.state, { vx: 0, vy: 0, vz: 0, spinX: 0, spinY: 0, spinZ: 0, stuckTimer: 0, lastX: 0, lastZ: 0, lastTouch: null });
+}
+
+// ===== 粒子 =====
+const explosionParticles = [];
+function createExplosion(x, z, count = 20, c1 = 0xff6600, c2 = 0xffcc00) {
+  for (let i = 0; i < count; i++) {
+    const p = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 6), new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? c1 : c2 }));
+    p.position.set(x, 0.5, z); scene.add(p);
+    const a = Math.random() * Math.PI * 2, s = 3 + Math.random() * 5;
+    explosionParticles.push({ mesh: p, vx: Math.cos(a) * s, vy: 3 + Math.random() * 5, vz: Math.sin(a) * s, life: 0.8 + Math.random() * 0.4 });
+  }
+}
+function updateExplosions(dt) {
+  for (let i = explosionParticles.length - 1; i >= 0; i--) {
+    const p = explosionParticles[i]; p.life -= dt;
+    if (p.life <= 0) { scene.remove(p.mesh); explosionParticles.splice(i, 1); continue; }
+    p.vy -= 15 * dt; p.mesh.position.x += p.vx * dt; p.mesh.position.y += p.vy * dt; p.mesh.position.z += p.vz * dt;
+    p.mesh.scale.setScalar(p.life);
+  }
+}
+
+// ===== 视觉效果 =====
+const freezeVisuals = [], shieldVisuals = [];
+function createFreezeEffect(player) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(PLAYER_R * 0.7, PLAYER_R * 0.7, 0.5, 12),
+    new THREE.MeshStandardMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.4, roughness: 0.1, metalness: 0.8 }));
+  m.position.y = 0.25; player.mesh.group.add(m); freezeVisuals.push({ mesh: m, player });
+}
+function removeFreezeEffect(player) {
+  const i = freezeVisuals.findIndex(f => f.player === player);
+  if (i >= 0) { player.mesh.group.remove(freezeVisuals[i].mesh); freezeVisuals.splice(i, 1); }
+}
+function createShieldEffect(player) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(PLAYER_R * 1.2, 16, 12),
+    new THREE.MeshStandardMaterial({ color: 0x4caf50, transparent: true, opacity: 0.25, roughness: 0.1, metalness: 0.3 }));
+  m.position.y = 0.2; player.mesh.group.add(m); shieldVisuals.push({ mesh: m, player });
+}
+function removeShieldEffect(player) {
+  const i = shieldVisuals.findIndex(s => s.player === player);
+  if (i >= 0) { player.mesh.group.remove(shieldVisuals[i].mesh); shieldVisuals.splice(i, 1); }
+}
+
+// ===== 道具系统 =====
+const POWERUP_TYPES = {
+  SPEED: { icon: '⚡', name: '加速', color: 0xffeb3b, duration: 6 },
+  FREEZE: { icon: '❄️', name: '冰冻', color: 0x00e5ff, duration: 3 },
+  BIG: { icon: '🦶', name: '大脚', color: 0xff6d00, duration: 5 },
+  BOMB: { icon: '💣', name: '炸弹', color: 0xf44336, duration: 0 },
+  MAGNET: { icon: '🧲', name: '磁铁', color: 0x9c27b0, duration: 5 },
+  SHIELD: { icon: '🛡️', name: '护盾', color: 0x4caf50, duration: 4 },
+  ROCKET: { icon: '🚀', name: '火箭弹', color: 0xff1744, duration: 0 },
+  ZAP: { icon: '⚡', name: '电击', color: 0x00e5ff, duration: 0 },
+  GUN: { icon: '🔫', name: '冲锋枪', color: 0x607d8b, duration: 0, ammo: 100 },
+  SNIPER: { icon: '🎯', name: '狙击枪', color: 0x263238, duration: 0, ammo: 5 },
+  GRENADE: { icon: '🎗️', name: '手雷', color: 0x795548, duration: 0 },
+  NUKE: { icon: '☢️', name: '核武器', color: 0xffeb3b, duration: 0 },
+  MULTIBALL: { icon: '⚽', name: '多球', color: 0xffffff, duration: 0 },
+  BOSS: { icon: '👹', name: '召唤Boss', color: 0xff0000, duration: 0 },
+};
+const WEAPON_TYPES = ['BOMB', 'ROCKET', 'ZAP', 'GUN', 'SNIPER', 'GRENADE', 'NUKE', 'MULTIBALL', 'BOSS'];
+const POWERUP_LIST = Object.keys(POWERUP_TYPES);
+
+// Boss召唤方块高概率权重
+const POWERUP_WEIGHTS = { SPEED:1, FREEZE:1, BIG:1, BOMB:1, MAGNET:1, SHIELD:1, ROCKET:1, ZAP:1, GUN:1, SNIPER:1, GRENADE:1, NUKE:0.5, MULTIBALL:1, BOSS:4 };
+const WEIGHTED_POWERUP_LIST = [];
+for (const k of POWERUP_LIST) { for (let i = 0; i < (POWERUP_WEIGHTS[k] || 1) * 10; i++) WEIGHTED_POWERUP_LIST.push(k); }
+
+const powerups = [];
+let powerupTimer = 2;
+function spawnPowerup() {
+  const typeKey = WEIGHTED_POWERUP_LIST[Math.floor(Math.random() * WEIGHTED_POWERUP_LIST.length)];
+  const type = POWERUP_TYPES[typeKey];
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5),
+    new THREE.MeshStandardMaterial({ color: type.color, emissive: type.color, emissiveIntensity: 0.5, roughness: 0.3 })));
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.06, 8, 24),
+    new THREE.MeshBasicMaterial({ color: type.color, transparent: true, opacity: 0.6 }));
+  ring.rotation.x = Math.PI / 2; g.add(ring);
+  // 在场地内随机位置
+  let px, pz;
+  do { px = (Math.random() - 0.5) * BASE_RADIUS * 1.5; pz = (Math.random() - 0.5) * BASE_RADIUS * 1.5; } while (!isInsidePolygon(px, pz));
+  g.position.set(px, 0.6, pz);
+  scene.add(g); powerups.push({ group: g, typeKey, type, ring });
+}
+function updatePowerups(dt) {
+  powerupTimer -= dt;
+  if (powerupTimer <= 0 && powerups.length < 5) { spawnPowerup(); powerupTimer = 3 + Math.random() * 4; }
+  for (const p of powerups) { p.group.rotation.y += dt * 2; p.ring.rotation.z += dt * 3; p.group.position.y = 0.6 + Math.sin(Date.now() * 0.003) * 0.15; }
+}
+function checkPowerupPickup(player) {
+  for (let i = powerups.length - 1; i >= 0; i--) {
+    const p = powerups[i];
+    if (Math.sqrt((player.x - p.group.position.x) ** 2 + (player.z - p.group.position.z) ** 2) < PLAYER_R + 0.5) {
+      if (WEAPON_TYPES.includes(p.typeKey)) activatePowerup(player, p.typeKey);
+      else { if (!player.heldPowerup) player.heldPowerup = p.typeKey; else activatePowerup(player, p.typeKey); }
+      scene.remove(p.group); powerups.splice(i, 1); sndPickup();
+    }
+  }
+}
+function activatePowerup(player, typeKey) {
+  const type = POWERUP_TYPES[typeKey]; showPowerupMsg(type.icon + ' ' + type.name + '!', type.color);
+  switch (typeKey) {
+    case 'SPEED': player.buffs.speed = type.duration; player.speedMultiplier = 2.0; break;
+    case 'FREEZE': for (const o of allPlayers) { if (o !== player) { o.buffs.frozen = type.duration; createFreezeEffect(o); } } break;
+    case 'BIG': player.buffs.bigKick = type.duration; break;
+    case 'BOMB': activateBomb(player, player.x, player.z); break;
+    case 'MAGNET': player.buffs.magnet = type.duration; break;
+    case 'SHIELD': player.buffs.shield = type.duration; createShieldEffect(player); break;
+    case 'ROCKET': activateRocket(player); break;
+    case 'ZAP': activateZap(player); break;
+    case 'GUN': player.gunAmmo += type.ammo; break;
+    case 'SNIPER': player.sniperAmmo += type.ammo; break;
+    case 'GRENADE': player.grenadeAmmo += 5; break;
+    case 'NUKE': activateNuke(player); break;
+    case 'MULTIBALL': spawnExtraBall(); break;
+    case 'BOSS': spawnBoss(player); break;
+  }
+}
+
+// ===== 伤害系统 =====
+function damagePlayer(victim, dmg, attacker) {
+  if (victim.dead) return;
+  if (victim.invincible > 0) return;
+  if (victim.buffs.shield) { victim.buffs.shield = 0; removeShieldEffect(victim); return; }
+  victim.hp -= dmg;
+  if (victim.hp <= 0) {
+    victim.hp = 0; victim.dead = true; victim.respawnTimer = RESPAWN_TIME; victim.mesh.group.visible = false;
+    if (attacker) { gameState.kills[attacker.team - 1]++; document.getElementById('k1').textContent = gameState.kills[0]; document.getElementById('k2').textContent = gameState.kills[1]; }
+    createExplosion(victim.x, victim.z); sndKill(); showPowerupMsg('💀 击杀!', 0xff0000);
+  }
+}
+
+function activateBomb(player, x, z) {
+  createExplosion(x, z); sndBomb();
+  const dx = balls[0].mesh.position.x - x, dz = balls[0].mesh.position.z - z, dist = Math.sqrt(dx * dx + dz * dz) || 1;
+  if (dist < 8) { const f = (8 - dist) * 6; balls[0].state.vx += (dx / dist) * f; balls[0].state.vy += f * 0.6; balls[0].state.vz += (dz / dist) * f; }
+  for (const o of allPlayers) { if (o === player) continue;
+    const odx = o.x - x, odz = o.z - z, od = Math.sqrt(odx * odx + odz * odz);
+    if (od < 4) damagePlayer(o, DMG_BOMB, player);
+    else if (od < 6) { const kf = (6 - od) * 5; o.knockVx += (odx / (od || 1)) * kf; o.knockVz += (odz / (od || 1)) * kf; }
+  }
+}
+
+// ===== 手雷 =====
+const grenades = [];
+function activateGrenade(player) {
+  if (player.grenadeAmmo <= 0) return;
+  if (player._grenadeCooldown > 0 && bosses.length === 0) return;
+  player.grenadeAmmo--; player._grenadeCooldown = 1.0;
+  const spd = 12; let baseVx, baseVz;
+  if (Math.abs(player.vx) > 0.5 || Math.abs(player.vz) > 0.5) { const m = Math.sqrt(player.vx * player.vx + player.vz * player.vz); baseVx = (player.vx / m) * spd; baseVz = (player.vz / m) * spd; }
+  else { baseVx = player.facing * spd; baseVz = 0; }
+  // 一次5发散射
+  for (let n = -2; n <= 2; n++) {
+    const spread = n * 0.2;
+    const cos = Math.cos(spread), sin = Math.sin(spread);
+    const vx = baseVx * cos - baseVz * sin;
+    const vz = baseVx * sin + baseVz * cos;
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), new THREE.MeshStandardMaterial({ color: 0x795548, roughness: 0.8 }));
+    mesh.position.set(player.x + (Math.random() - 0.5) * 0.3, 0.3, player.z + (Math.random() - 0.5) * 0.3); scene.add(mesh);
+    grenades.push({ mesh, vx, vz, vy: 5 + Math.random() * 2, owner: player, life: 1.2 + Math.random() * 0.2, bounces: BOUNCE_MAX });
+  }
+}
+function updateGrenades(dt) {
+  for (let i = grenades.length - 1; i >= 0; i--) {
+    const g = grenades[i]; g.life -= dt; g.vy -= 15 * dt;
+    g.mesh.position.x += g.vx * dt; g.mesh.position.y += g.vy * dt; g.mesh.position.z += g.vz * dt;
+    if (g.mesh.position.y < 0.15) { g.mesh.position.y = 0.15; g.vy *= -0.3; g.vx *= 0.6; g.vz *= 0.6; }
+    // 反弹场地边缘
+    for (const e of fieldEdges) {
+      const sd = signedDistToEdge(g.mesh.position.x, g.mesh.position.z, e);
+      if (sd < 0.15) {
+        const dot = g.vx * e.nx + g.vz * e.nz;
+        g.vx -= 2 * dot * e.nx; g.vz -= 2 * dot * e.nz;
+        g.mesh.position.x += e.nx * (0.15 - sd); g.mesh.position.z += e.nz * (0.15 - sd);
+        g.bounces--; if (g.bounces < 0) g.life = 0;
+        break;
+      }
+    }
+    if (g.life <= 0) {
+      createExplosion(g.mesh.position.x, g.mesh.position.z, 30, 0xff6600, 0xff3300); sndBomb();
+      const gx = g.mesh.position.x, gz = g.mesh.position.z;
+      for (const b of balls) {
+        const dx = b.mesh.position.x - gx, dz = b.mesh.position.z - gz, d = Math.sqrt(dx * dx + dz * dz) || 1;
+        if (d < 5) { const f = (5 - d) * 8; b.state.vx += (dx / d) * f; b.state.vy += f * 0.8; b.state.vz += (dz / d) * f; }
+      }
+      for (const p of allPlayers) { if (p === g.owner) continue;
+        const pdx = p.x - gx, pdz = p.z - gz, pd = Math.sqrt(pdx * pdx + pdz * pdz);
+        if (pd < 5) damagePlayer(p, DMG_GRENADE, g.owner);
+        else if (pd < 7) { const kf = (7 - pd) * 4; p.knockVx += (pdx / (pd || 1)) * kf; p.knockVz += (pdz / (pd || 1)) * kf; }
+      }
+      // Boss手雷受伤
+      for (const boss of bosses) { if (boss.dead || g.owner === boss) continue;
+        const pdx = boss.x - gx, pdz = boss.z - gz, pd = Math.sqrt(pdx * pdx + pdz * pdz);
+        if (pd < 5) damageBoss(boss, DMG_GRENADE);
+      }
+      scene.remove(g.mesh); grenades.splice(i, 1);
+    }
+  }
+}
+
+// ===== 核武器 =====
+let nukeFlash = null;
+function activateNuke(player) {
+  createExplosion(0, 0, 80, 0xffeb3b, 0xff6600); createExplosion(5, 5, 40, 0xffffff, 0xffcc00); createExplosion(-5, -5, 40, 0xff3300, 0xffcc00);
+  sndNuke();
+  for (const b of balls) { b.state.vx += (Math.random() - 0.5) * 30; b.state.vy += 25; b.state.vz += (Math.random() - 0.5) * 30; }
+  for (const o of allPlayers) { if (o === player) continue; damagePlayer(o, DMG_NUKE, player); }
+  nukeFlash = { life: 0.8 };
+}
+
+// ===== Boss系统 =====
+const bosses = [];
+const BOSS_HP = 30000;
+const BOSS_SCALE = 4;
+const BOSS_R = PLAYER_R * BOSS_SCALE;
+
+function createBossMesh() {
+  const g = new THREE.Group();
+  // 巨大暗红身体
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(PLAYER_R * 0.5 * BOSS_SCALE, PLAYER_R * 0.55 * BOSS_SCALE, PLAYER_H * BOSS_SCALE, 16),
+    new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.4, metalness: 0.6 }));
+  body.rotation.z = Math.PI / 2; body.castShadow = true; g.add(body);
+  // 大头
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28 * BOSS_SCALE, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0x4a0000, roughness: 0.5, metalness: 0.4 }));
+  head.position.set(0.7 * BOSS_SCALE, 0.12 * BOSS_SCALE, 0); head.castShadow = true; g.add(head);
+  // 角
+  const hornMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.9, roughness: 0.2 });
+  const lh = new THREE.Mesh(new THREE.ConeGeometry(0.15 * BOSS_SCALE, 0.6 * BOSS_SCALE, 8), hornMat);
+  lh.position.set(0.7 * BOSS_SCALE, 0.5 * BOSS_SCALE, -0.25 * BOSS_SCALE); lh.rotation.x = -0.3; g.add(lh);
+  const rh = new THREE.Mesh(new THREE.ConeGeometry(0.15 * BOSS_SCALE, 0.6 * BOSS_SCALE, 8), hornMat);
+  rh.position.set(0.7 * BOSS_SCALE, 0.5 * BOSS_SCALE, 0.25 * BOSS_SCALE); rh.rotation.x = 0.3; g.add(rh);
+  // 发光红眼
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+  const le = new THREE.Mesh(new THREE.SphereGeometry(0.08 * BOSS_SCALE, 6, 6), eyeMat);
+  le.position.set(0.95 * BOSS_SCALE, 0.2 * BOSS_SCALE, -0.15 * BOSS_SCALE); g.add(le);
+  const re = new THREE.Mesh(new THREE.SphereGeometry(0.08 * BOSS_SCALE, 6, 6), eyeMat);
+  re.position.set(0.95 * BOSS_SCALE, 0.2 * BOSS_SCALE, 0.15 * BOSS_SCALE); g.add(re);
+  // 粗大的腿
+  const legGeo = new THREE.CylinderGeometry(0.10 * BOSS_SCALE, 0.08 * BOSS_SCALE, LEG_LEN * BOSS_SCALE, 8);
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x5a0000, roughness: 0.6 });
+  const ll = new THREE.Mesh(legGeo, legMat); ll.position.set(-0.3 * BOSS_SCALE, -0.05 * BOSS_SCALE, -0.35 * BOSS_SCALE); ll.castShadow = true; g.add(ll);
+  const rl = new THREE.Mesh(legGeo, legMat); rl.position.set(-0.3 * BOSS_SCALE, -0.05 * BOSS_SCALE, 0.35 * BOSS_SCALE); rl.castShadow = true; g.add(rl);
+  // 血条
+  const hpBar = createHPBar(); hpBar.sprite.scale.set(4, 0.4, 1); hpBar.sprite.position.y = 2.5 * BOSS_SCALE; g.add(hpBar.sprite);
+  scene.add(g);
+  return { group: g, body, head, leftLeg: ll, rightLeg: rl, hpBar };
+}
+
+function spawnBoss(spawner) {
+  const mesh = createBossMesh();
+  let px, pz;
+  do { px = (Math.random() - 0.5) * BASE_RADIUS * 0.8; pz = (Math.random() - 0.5) * BASE_RADIUS * 0.8; } while (!isInsidePolygon(px, pz));
+  const boss = {
+    mesh, x: px, z: pz, y: 0, vx: 0, vz: 0, facing: 1,
+    hp: BOSS_HP, dead: false, gunAmmo: Infinity, sniperAmmo: Infinity, grenadeAmmo: Infinity,
+    gunFireTimer: 0, sniperTimer: 0, grenadeCooldown: 0, kickTimer: 0,
+    wrigglePhase: 0, invincible: 0
+  };
+  bosses.push(boss);
+  showPowerupMsg('👹 BOSS降临!', 0xff0000);
+  createExplosion(px, pz, 40, 0xff0000, 0xff6600);
+  sndNuke();
+}
+
+function updateBossHP(boss) {
+  const c = boss.mesh.hpBar.canvas, ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, 128, 16);
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, 128, 16);
+  const pct = Math.max(0, boss.hp / BOSS_HP);
+  ctx.fillStyle = `rgb(${Math.floor(255 * (1 - pct))},${Math.floor(80 * pct)},0)`;
+  ctx.fillRect(1, 1, 126 * pct, 14);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(Math.ceil(boss.hp), 64, 8);
+  boss.mesh.hpBar.tex.needsUpdate = true;
+}
+
+function updateBosses(dt) {
+  for (let bi = bosses.length - 1; bi >= 0; bi--) {
+    const boss = bosses[bi];
+    if (boss.dead) continue;
+    // Boss受伤检测 - 子弹、狙击、火箭
+    // (在各自updateBullets等中处理)
+
+    // 找最近的玩家攻击
+    let target = null, tDist = Infinity;
+    for (const p of allPlayers) {
+      if (p.dead) continue;
+      const d = Math.sqrt((p.x - boss.x) ** 2 + (p.z - boss.z) ** 2);
+      if (d < tDist) { tDist = d; target = p; }
+    }
+    // 也攻击其他Boss
+    for (const ob of bosses) {
+      if (ob === boss || ob.dead) continue;
+      const d = Math.sqrt((ob.x - boss.x) ** 2 + (ob.z - boss.z) ** 2);
+      if (d < tDist) { tDist = d; target = ob; }
+    }
+
+    const moveSpeed = MOVE_SPEED * 0.6;
+    if (target) {
+      const dx = (target.x || 0) - boss.x, dz = (target.z || 0) - boss.z;
+      const dist = Math.sqrt(dx * dx + dz * dz) || 1;
+      boss.vx += (dx / dist) * moveSpeed * dt;
+      boss.vz += (dz / dist) * moveSpeed * dt;
+      if (Math.abs(dx) > 0.5) boss.facing = dx > 0 ? 1 : -1;
+    }
+    boss.vx *= PLAYER_FRIC; boss.vz *= PLAYER_FRIC;
+    boss.x += boss.vx * dt; boss.z += boss.vz * dt;
+    const c = constrainToField(boss.x, boss.z, BOSS_R);
+    boss.x = c.x; boss.z = c.z;
+    boss.wrigglePhase += Math.sqrt(boss.vx * boss.vx + boss.vz * boss.vz) * dt * WRIGGLE_SPEED;
+
+    // Boss攻击
+    boss.gunFireTimer -= dt;
+    boss.sniperTimer -= dt;
+    boss.grenadeCooldown -= dt;
+
+    // 冲锋枪 - 持续射击
+    if (target && tDist < 15 && boss.gunFireTimer <= 0) {
+      const bMesh = new THREE.Mesh(new THREE.SphereGeometry(0.12, 4, 4), new THREE.MeshBasicMaterial({ color: 0xff4400 }));
+      bMesh.position.set(boss.x, 0.5, boss.z); scene.add(bMesh);
+      const speed = 35;
+      let vx, vz;
+      const dx = (target.x || 0) - boss.x, dz = (target.z || 0) - boss.z, dm = Math.sqrt(dx * dx + dz * dz) || 1;
+      vx = (dx / dm) * speed; vz = (dz / dm) * speed;
+      bullets.push({ mesh: bMesh, vx, vz, owner: boss, bounces: BOUNCE_MAX, isBoss: true });
+      boss.gunFireTimer = 0.08;
+      sndGun();
+    }
+    // 狙击枪
+    if (target && tDist < 20 && boss.sniperTimer <= 0) {
+      const sMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.8, 6), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+      sMesh.rotation.z = Math.PI / 2; sMesh.position.set(boss.x, 0.5, boss.z); scene.add(sMesh);
+      const speed = 55;
+      const dx = (target.x || 0) - boss.x, dz = (target.z || 0) - boss.z, dm = Math.sqrt(dx * dx + dz * dz) || 1;
+      sniperRounds.push({ mesh: sMesh, vx: (dx / dm) * speed, vz: (dz / dm) * speed, owner: boss, bounces: BOUNCE_MAX, isBoss: true });
+      boss.sniperTimer = 1.5;
+      sndSniper();
+    }
+    // 手雷
+    if (target && tDist < 12 && boss.grenadeCooldown <= 0) {
+      const gMesh = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0xff0000, emissiveIntensity: 0.5 }));
+      gMesh.position.set(boss.x, 0.5, boss.z); scene.add(gMesh);
+      const spd = 15;
+      const dx = (target.x || 0) - boss.x, dz = (target.z || 0) - boss.z, dm = Math.sqrt(dx * dx + dz * dz) || 1;
+      grenades.push({ mesh: gMesh, vx: (dx / dm) * spd, vz: (dz / dm) * spd, vy: 6, owner: boss, life: 1.0, bounces: 2, isBoss: true });
+      boss.grenadeCooldown = 1.0;
+    }
+
+    // Boss碰撞伤害 + 物理推开玩家
+    for (const p of allPlayers) {
+      if (p.dead) continue;
+      const dx = p.x - boss.x, dz = p.z - boss.z, dist = Math.sqrt(dx * dx + dz * dz);
+      const minDist = BOSS_R + PLAYER_R;
+      if (dist < minDist && dist > 0.01) {
+        damagePlayer(p, 5, boss);
+        const nd = dist || 1;
+        const overlap = minDist - dist;
+        // 推开玩家
+        p.x += (dx / nd) * overlap;
+        p.z += (dz / nd) * overlap;
+        p.knockVx += (dx / nd) * 25;
+        p.knockVz += (dz / nd) * 25;
+      }
+    }
+    // Boss之间碰撞
+    for (const ob of bosses) {
+      if (ob === boss || ob.dead) continue;
+      const dx = boss.x - ob.x, dz = boss.z - ob.z, dist = Math.sqrt(dx * dx + dz * dz);
+      const minDist = BOSS_R * 2;
+      if (dist < minDist && dist > 0.01) {
+        const nd = dist || 1;
+        const overlap = (minDist - dist) * 0.5;
+        boss.x += (dx / nd) * overlap;
+        boss.z += (dz / nd) * overlap;
+        ob.x -= (dx / nd) * overlap;
+        ob.z -= (dz / nd) * overlap;
+        damageBoss(ob, 2);
+      }
+    }
+    // Boss推球/踢球
+    for (const b of balls) {
+      const dx = b.mesh.position.x - boss.x, dz = b.mesh.position.z - boss.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      const minDist = BOSS_R + b._radius;
+      if (dist < minDist && dist > 0.01) {
+        const nd = dist || 1;
+        const overlap = minDist - dist;
+        b.mesh.position.x += (dx / nd) * overlap;
+        b.mesh.position.z += (dz / nd) * overlap;
+        b.state.vx += (dx / nd) * 15 + boss.vx * 0.5;
+        b.state.vy += 3;
+        b.state.vz += (dz / nd) * 15 + boss.vz * 0.5;
+        b.state.lastTouch = null;
+      }
+    }
+
+    // 更新Boss mesh
+    boss.mesh.group.position.set(boss.x, boss.y, boss.z);
+    const s2d = Math.sqrt(boss.vx * boss.vx + boss.vz * boss.vz);
+    if (s2d > 0.3) boss.mesh.group.rotation.y = -Math.atan2(boss.vz, boss.vx) + Math.PI / 2;
+    const wr = Math.sin(boss.wrigglePhase) * 0.06 * Math.min(s2d / 2, 1);
+    boss.mesh.body.rotation.y = wr;
+    // 发光效果
+    boss.mesh.body.material.emissiveIntensity = 0.2 + Math.sin(Date.now() * 0.005) * 0.1;
+    boss.mesh.body.material.emissive = new THREE.Color(0xff0000);
+    updateBossHP(boss);
+
+    // Boss死亡
+    if (boss.hp <= 0) {
+      boss.dead = true;
+      createExplosion(boss.x, boss.z, 60, 0xff0000, 0xff6600);
+      createExplosion(boss.x + 2, boss.z, 30, 0xffcc00, 0xff3300);
+      createExplosion(boss.x - 2, boss.z, 30, 0xff6600, 0xffffff);
+      sndNuke();
+      scene.remove(boss.mesh.group);
+      bosses.splice(bi, 1);
+      showPowerupMsg('💀 BOSS被击败!', 0xffcc00);
+    }
+  }
+}
+
+function damageBoss(boss, dmg) {
+  boss.hp -= dmg;
+}
+
+// ===== 重生 =====
+function updateDead(dt) {
+  for (const p of allPlayers) { if (p.dead) { p.respawnTimer -= dt;
+    if (p.respawnTimer <= 0) { p.dead = false; p.hp = MAX_HP; p.invincible = INVINCIBLE_TIME; p.reset(); p.mesh.group.visible = true; p.heldPowerup = null; p.buffs = { speed: 0, frozen: 0, bigKick: 0, magnet: 0, shield: 0 }; p.speedMultiplier = 1.0; p.gunAmmo = 0; p.sniperAmmo = 0; p.grenadeAmmo = 99999999999; }
+  } else if (p.invincible > 0) { p.invincible -= dt; if (p.invincible < 0) p.invincible = 0; } }
+}
+function updateRespawnUI() {
+  const el = document.getElementById('respawnBar'); let html = '';
+  for (const p of allPlayers) { if (p.dead) {
+    const name = p === p1 ? 'P1' : p === p2 ? 'P2' : p === ai1 ? 'AI1' : 'AI2';
+    const color = p.team === 1 ? '#4fc3f7' : '#ef5350';
+    html += `<span class="respawn-tag" style="color:${color}">${name} 复活 ${Math.ceil(p.respawnTimer)}s</span>`;
+  }}
+  for (const boss of bosses) { if (!boss.dead) {
+    html += `<span class="respawn-tag" style="color:#ff0000">👹BOSS HP:${Math.ceil(boss.hp)}</span>`;
+  }}
+  el.innerHTML = html;
+}
+
+// ===== 火箭弹（5发散射）=====
+const rockets = [];
+function activateRocket(player) {
+  const speed = 25;
+  let baseDx, baseDz;
+  if (Math.abs(player.vx) > 0.5 || Math.abs(player.vz) > 0.5) { const m = Math.sqrt(player.vx * player.vx + player.vz * player.vz); baseDx = player.vx / m; baseDz = player.vz / m; }
+  else { baseDx = player.facing; baseDz = 0; }
+  for (let n = -2; n <= 2; n++) {
+    const spread = n * 0.15;
+    const cos = Math.cos(spread), sin = Math.sin(spread);
+    const dx = baseDx * cos - baseDz * sin, dz = baseDx * sin + baseDz * cos;
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.6, 8), new THREE.MeshStandardMaterial({ color: 0xff1744, emissive: 0xff1744, emissiveIntensity: 0.6 }));
+    mesh.rotation.z = Math.PI / 2; mesh.position.set(player.x, 0.3, player.z); scene.add(mesh);
+    rockets.push({ mesh, vx: dx * speed, vz: dz * speed, owner: player, bounces: BOUNCE_MAX });
+  }
+}
+function updateRockets(dt) {
+  for (let i = rockets.length - 1; i >= 0; i--) {
+    const r = rockets[i]; r.mesh.position.x += r.vx * dt; r.mesh.position.z += r.vz * dt;
+    let bounced = false;
+    for (const e of fieldEdges) {
+      const sd = signedDistToEdge(r.mesh.position.x, r.mesh.position.z, e);
+      if (sd < 0.15) {
+        const dot = r.vx * e.nx + r.vz * e.nz;
+        r.vx -= 2 * dot * e.nx; r.vz -= 2 * dot * e.nz;
+        r.mesh.position.x += e.nx * (0.15 - sd); r.mesh.position.z += e.nz * (0.15 - sd);
+        r.bounces--; bounced = true; break;
+      }
+    }
+    let hit = false;
+    for (const p of allPlayers) { if (p === r.owner || p.dead) continue;
+      if (Math.sqrt((p.x - r.mesh.position.x) ** 2 + (p.z - r.mesh.position.z) ** 2) < PLAYER_R + 0.3) { damagePlayer(p, DMG_ROCKET, r.owner); hit = true; break; }
+    }
+    // Boss受伤
+    if (!hit) for (const boss of bosses) { if (boss.dead || r.owner === boss) continue;
+      if (Math.sqrt((boss.x - r.mesh.position.x) ** 2 + (boss.z - r.mesh.position.z) ** 2) < BOSS_R + 0.4) { damageBoss(boss, DMG_ROCKET); hit = true; break; }
+    }
+    if (hit || r.bounces < 0) { if (hit) { createExplosion(r.mesh.position.x, r.mesh.position.z); sndBomb(); } scene.remove(r.mesh); rockets.splice(i, 1); }
+  }
+}
+
+// ===== 电击 =====
+const zapBeams = [];
+function activateZap(player) {
+  let closest = null, cd = 10;
+  for (const o of allPlayers) { if (o === player || o.dead) continue;
+    const d = Math.sqrt((o.x - player.x) ** 2 + (o.z - player.z) ** 2); if (d < cd) { cd = d; closest = o; } }
+  if (!closest) return; damagePlayer(closest, DMG_ZAP, player);
+  const pts = [new THREE.Vector3(player.x, 0.3, player.z), new THREE.Vector3(closest.x, 0.3, closest.z)];
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x00e5ff, linewidth: 3 }));
+  scene.add(line); zapBeams.push({ mesh: line, life: 0.3 }); sndZap();
+}
+function updateZapBeams(dt) { for (let i = zapBeams.length - 1; i >= 0; i--) { zapBeams[i].life -= dt; if (zapBeams[i].life <= 0) { scene.remove(zapBeams[i].mesh); zapBeams.splice(i, 1); } } }
+
+// ===== 冲锋枪 =====
+const bullets = [];
+function fireBullet(player) {
+  if (player.gunAmmo <= 0) return; player.gunAmmo--;
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.08, 4, 4), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
+  mesh.position.set(player.x, 0.3, player.z); scene.add(mesh);
+  const speed = 30; let vx, vz;
+  if (Math.abs(player.vx) > 0.5 || Math.abs(player.vz) > 0.5) { const m = Math.sqrt(player.vx * player.vx + player.vz * player.vz); vx = (player.vx / m) * speed; vz = (player.vz / m) * speed; }
+  else { vx = player.facing * speed; vz = 0; }
+  bullets.push({ mesh, vx, vz, owner: player, bounces: BOUNCE_MAX }); sndGun();
+}
+function updateBullets(dt) {
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i]; b.mesh.position.x += b.vx * dt; b.mesh.position.z += b.vz * dt;
+    for (const e of fieldEdges) {
+      const sd = signedDistToEdge(b.mesh.position.x, b.mesh.position.z, e);
+      if (sd < 0) {
+        const dot = b.vx * e.nx + b.vz * e.nz;
+        b.vx -= 2 * dot * e.nx; b.vz -= 2 * dot * e.nz;
+        b.mesh.position.x += e.nx * (-sd); b.mesh.position.z += e.nz * (-sd);
+        b.bounces--; break;
+      }
+    }
+    let hit = false;
+    for (const p of allPlayers) { if (p === b.owner || p.dead) continue;
+      if (Math.sqrt((p.x - b.mesh.position.x) ** 2 + (p.z - b.mesh.position.z) ** 2) < PLAYER_R + 0.15) { damagePlayer(p, DMG_GUN, b.owner); hit = true; break; }
+    }
+    // Boss受伤
+    if (!hit) for (const boss of bosses) { if (boss.dead || b.owner === boss) continue;
+      if (Math.sqrt((boss.x - b.mesh.position.x) ** 2 + (boss.z - b.mesh.position.z) ** 2) < BOSS_R + 0.2) { damageBoss(boss, DMG_GUN); hit = true; break; }
+    }
+    if (hit || b.bounces < 0) { scene.remove(b.mesh); bullets.splice(i, 1); }
+  }
+}
+
+// ===== 狙击枪 =====
+const sniperRounds = [];
+function fireSniper(player) {
+  if (player.sniperAmmo <= 0) return; player.sniperAmmo--;
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 6), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+  mesh.rotation.z = Math.PI / 2; mesh.position.set(player.x, 0.3, player.z); scene.add(mesh);
+  const speed = 50; let vx, vz;
+  if (Math.abs(player.vx) > 0.5 || Math.abs(player.vz) > 0.5) { const m = Math.sqrt(player.vx * player.vx + player.vz * player.vz); vx = (player.vx / m) * speed; vz = (player.vz / m) * speed; }
+  else { vx = player.facing * speed; vz = 0; }
+  sniperRounds.push({ mesh, vx, vz, owner: player, bounces: BOUNCE_MAX }); sndSniper();
+}
+function updateSniperRounds(dt) {
+  for (let i = sniperRounds.length - 1; i >= 0; i--) {
+    const s = sniperRounds[i]; s.mesh.position.x += s.vx * dt; s.mesh.position.z += s.vz * dt;
+    s.mesh.rotation.y = -Math.atan2(s.vz, s.vx) + Math.PI / 2;
+    for (const e of fieldEdges) {
+      const sd = signedDistToEdge(s.mesh.position.x, s.mesh.position.z, e);
+      if (sd < 0) {
+        const dot = s.vx * e.nx + s.vz * e.nz;
+        s.vx -= 2 * dot * e.nx; s.vz -= 2 * dot * e.nz;
+        s.mesh.position.x += e.nx * (-sd); s.mesh.position.z += e.nz * (-sd);
+        s.bounces--; break;
+      }
+    }
+    let hit = false;
+    for (const p of allPlayers) { if (p === s.owner || p.dead) continue;
+      if (Math.sqrt((p.x - s.mesh.position.x) ** 2 + (p.z - s.mesh.position.z) ** 2) < PLAYER_R + 0.2) { damagePlayer(p, DMG_SNIPER, s.owner); hit = true; break; }
+    }
+    // Boss受伤
+    if (!hit) for (const boss of bosses) { if (boss.dead || s.owner === boss) continue;
+      if (Math.sqrt((boss.x - s.mesh.position.x) ** 2 + (boss.z - s.mesh.position.z) ** 2) < BOSS_R + 0.3) { damageBoss(boss, DMG_SNIPER); hit = true; break; }
+    }
+    if (hit || s.bounces < 0) { if (hit) createExplosion(s.mesh.position.x, s.mesh.position.z, 5); scene.remove(s.mesh); sniperRounds.splice(i, 1); }
+  }
+}
+
+// 瞄准射线
+const aimLines = [];
+function updateAimLines() {
+  for (const l of aimLines) scene.remove(l); aimLines.length = 0;
+  if (!p1.dead && p1.gunAmmo > 0 && keys['e']) createAimLine(p1, 0xffff00);
+  if (!p1.dead && p1.sniperAmmo > 0 && keys['q']) createAimLine(p1, 0xff0000);
+  if (!p2.dead && p2.gunAmmo > 0 && keys['.']) createAimLine(p2, 0xffff00);
+  if (!p2.dead && p2.sniperAmmo > 0 && keys[',']) createAimLine(p2, 0xff0000);
+}
+function createAimLine(player, color) {
+  let dx, dz;
+  if (Math.abs(player.vx) > 0.5 || Math.abs(player.vz) > 0.5) { const m = Math.sqrt(player.vx * player.vx + player.vz * player.vz); dx = player.vx / m; dz = player.vz / m; }
+  else { dx = player.facing; dz = 0; }
+  const pts = [new THREE.Vector3(player.x, 0.3, player.z), new THREE.Vector3(player.x + dx * 10, 0.3, player.z + dz * 10)];
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineDashedMaterial({ color, dashSize: 0.3, gapSize: 0.2, transparent: true, opacity: 0.6 }));
+  line.computeLineDistances(); scene.add(line); aimLines.push(line);
+}
+
+// ===== Buff更新 =====
+function updateBuffs(dt) { for (const p of allPlayers) { if (p.dead) continue;
+  for (const key of Object.keys(p.buffs)) { if (p.buffs[key] > 0) { p.buffs[key] -= dt; if (p.buffs[key] <= 0) { p.buffs[key] = 0;
+    if (key === 'speed') p.speedMultiplier = 1.0; if (key === 'frozen') removeFreezeEffect(p); if (key === 'shield') removeShieldEffect(p); } } }
+} }
+function showPowerupMsg(text, color) { const el = document.getElementById('powerupMsg'); el.textContent = text; el.style.color = '#' + color.toString(16).padStart(6, '0'); el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 1200); }
+
+// ===== 血条 =====
+function createHPBar() {
+  const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 16;
+  const tex = new THREE.CanvasTexture(canvas); tex.minFilter = THREE.LinearFilter;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  sprite.scale.set(1.2, 0.15, 1); return { sprite, tex, canvas };
+}
+function updateHPBar(player) {
+  const c = player.hpBar.canvas, ctx = c.getContext('2d'); ctx.clearRect(0, 0, 128, 16);
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, 128, 16);
+  const pct = player.hp / MAX_HP; const r = Math.floor(255 * (1 - pct)), g = Math.floor(255 * pct);
+  ctx.fillStyle = `rgb(${r},${g},0)`; ctx.fillRect(1, 1, 126 * pct, 14);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(Math.ceil(player.hp), 64, 8); player.hpBar.tex.needsUpdate = true;
+}
+
+// ===== 创建玩家 =====
+function createPlayer(color, num) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(PLAYER_R * 0.5, PLAYER_R * 0.55, PLAYER_H, 16), new THREE.MeshStandardMaterial({ color, roughness: 0.6 }));
+  body.rotation.z = Math.PI / 2; body.castShadow = true; g.add(body);
+  const c2 = document.createElement('canvas'); c2.width = 64; c2.height = 64;
+  const ctx = c2.getContext('2d'); ctx.fillStyle = '#fff'; ctx.font = 'bold 48px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(num, 32, 32);
+  const np = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.4), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c2), transparent: true }));
+  np.position.set(0, 0.3, 0); np.rotation.x = -Math.PI / 2; g.add(np);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 12), new THREE.MeshStandardMaterial({ color: 0xffcc80, roughness: 0.7 }));
+  head.position.set(0.7, 0.12, 0); head.castShadow = true; g.add(head);
+  const hc = color === 0x4fc3f7 ? 0x1565c0 : color === 0xef5350 ? 0xc62828 : color === 0x81d4fa ? 0x0d47a1 : 0xb71c1c;
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.29, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: hc }));
+  hair.position.set(0.7, 0.15, 0); g.add(hair);
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), new THREE.MeshBasicMaterial({ color: 0x111111 }));
+  eye.position.set(0.95, 0.16, -0.1); g.add(eye);
+  const legGeo = new THREE.CylinderGeometry(0.10, 0.08, LEG_LEN, 8);
+  const legMat = new THREE.MeshStandardMaterial({ color, roughness: 0.6 });
+  const leftLeg = new THREE.Mesh(legGeo, legMat); leftLeg.position.set(-0.3, -0.05, -0.35); leftLeg.castShadow = true; g.add(leftLeg);
+  const rightLeg = new THREE.Mesh(legGeo, legMat); rightLeg.position.set(-0.3, -0.05, 0.35); rightLeg.castShadow = true; g.add(rightLeg);
+  const footMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+  const leftFoot = new THREE.Mesh(new THREE.SphereGeometry(0.10, 8, 8), footMat); leftFoot.position.set(-0.3 + Math.cos(0.5) * LEG_LEN * 0.5, -0.05 - Math.sin(0.5) * LEG_LEN * 0.5, -0.35); g.add(leftFoot);
+  const rightFoot = new THREE.Mesh(new THREE.SphereGeometry(0.10, 8, 8), footMat); rightFoot.position.set(-0.3 + Math.cos(0.5) * LEG_LEN * 0.5, -0.05 - Math.sin(0.5) * LEG_LEN * 0.5, 0.35); g.add(rightFoot);
+  const armMat = new THREE.MeshStandardMaterial({ color: 0xffcc80, roughness: 0.7 });
+  const la = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.6, 8), armMat); la.position.set(0.2, -0.02, -0.4); la.rotation.z = 0.3; g.add(la);
+  const ra = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.6, 8), armMat); ra.position.set(0.2, -0.02, 0.4); ra.rotation.z = 0.3; g.add(ra);
+  const hpBar = createHPBar(); hpBar.sprite.position.y = 1.2; g.add(hpBar.sprite);
+  scene.add(g);
+  return { group: g, body, leftLeg, rightLeg, leftFoot, rightFoot, head, hair, eye, leftArm: la, rightArm: ra, hpBar };
+}
+
+// ===== 玩家状态 =====
+class PlayerState {
+  constructor(mesh, startX, startZ, facing, color, team, isAI = false) {
+    this.mesh = mesh; this.startX = startX; this.startZ = startZ; this.facing = facing; this.color = color; this.team = team; this.isAI = isAI;
+    this.wrigglePhase = Math.random() * Math.PI * 2; this.heldPowerup = null; this.speedMultiplier = 1.0;
+    this.dead = false; this.respawnTimer = 0; this.invincible = 0; this.hp = MAX_HP;
+    this.hpBar = mesh.hpBar;
+    this.gunAmmo = 0; this.sniperAmmo = 0; this.grenadeAmmo = 99999999999; this.gunFireTimer = 0; this.aiGunTimer = 0; this._grenadeCooldown = 0;
+    this._sniperFired = false;
+    this.buffs = { speed: 0, frozen: 0, bigKick: 0, magnet: 0, shield: 0 }; this.reset();
+  }
+  reset() { this.x = this.startX; this.z = this.startZ; this.y = 0; this.vx = 0; this.vy = 0; this.vz = 0;
+    this.leftLeg = 0; this.rightLeg = 0; this.leftTimer = 0; this.rightTimer = 0;
+    this.knockVx = 0; this.knockVz = 0; this.aiKickTimer = 0; this.wrigglePhase = Math.random() * Math.PI * 2; }
+  getLegPositions() {
+    const la = this.leftLeg === 1 ? 1.0 : this.leftLeg === -1 ? 0.1 : 0.5;
+    const ra = this.rightLeg === 1 ? 1.0 : this.rightLeg === -1 ? 0.1 : 0.5;
+    return { lAngle: la, rAngle: ra };
+  }
+  updateAI(dt) {
+    if (this.dead || this.buffs.frozen > 0) return;
+    if (this._grenadeCooldown > 0) this._grenadeCooldown -= dt;
+    // 找最近的球
+    let nearBall = balls[0], nearDist = Infinity;
+    for (const b of balls) { const d = Math.sqrt((b.mesh.position.x - this.x) ** 2 + (b.mesh.position.z - this.z) ** 2); if (d < nearDist) { nearDist = d; nearBall = b; } }
+    const bx = nearBall.mesh.position.x, bz = nearBall.mesh.position.z, dx = bx - this.x, dz = bz - this.z, dist = Math.sqrt(dx * dx + dz * dz);
+    const speed = MOVE_SPEED * 0.88 * this.speedMultiplier;
+    // 朝对方球门进攻
+    const myGoals = goalSegments.filter(g => g.team !== this.team);
+    const myGoal = myGoals.length > 0 ? myGoals[Math.floor(Math.random() * myGoals.length)] : null;
+    const goalX = myGoal ? myGoal.cx : 0;
+    const goalZ = myGoal ? myGoal.cz : 0;
+    if (dist > 1.5) { this.vx += (dx / dist) * speed * dt; this.vz += (dz / dist) * speed * dt; }
+    else if (dist < 2) { const tgx = goalX - this.x, tgz = goalZ - this.z, tgm = Math.sqrt(tgx * tgx + tgz * tgz) || 1; this.vx += (tgx / tgm) * speed * dt; this.vz += (tgz / tgm) * speed * dt; }
+    if (Math.abs(dx) > 0.5) this.facing = dx > 0 ? 1 : -1;
+    if (dist < 2.5) { this.aiKickTimer -= dt; if (this.aiKickTimer <= 0) { if (Math.random() < 0.5 && this.leftTimer <= 0) { this.leftLeg = 1; this.leftTimer = 0.3; } else if (this.rightTimer <= 0) { this.rightLeg = 1; this.rightTimer = 0.3; } this.aiKickTimer = 0.3 + Math.random() * 0.3; } }
+    if (this.gunAmmo > 0) { this.aiGunTimer -= dt; if (this.aiGunTimer <= 0) { for (const o of allPlayers) { if (o === this || o.dead) continue; const ed = Math.sqrt((o.x - this.x) ** 2 + (o.z - this.z) ** 2); if (ed < 10) { fireBullet(this); this.aiGunTimer = 0.12; break; } } } }
+    if (this.sniperAmmo > 0 && Math.random() < 0.005) fireSniper(this);
+    if (this.grenadeAmmo > 0 && Math.random() < 0.01) activateGrenade(this);
+    checkPowerupPickup(this);
+    if (this.heldPowerup && Math.random() < 0.008) { activatePowerup(this, this.heldPowerup); this.heldPowerup = null; }
+  }
+  update(dt, leftKey, rightKey, upKey, downKey, leftLegKey, rightLegKey) {
+    if (this.dead || this.buffs.frozen > 0) return;
+    if (this.isAI) { this.updateAI(dt); }
+    else { if (this._grenadeCooldown > 0) this._grenadeCooldown -= dt;
+      const speed = MOVE_SPEED * this.speedMultiplier;
+      if (keys[leftKey]) this.vx -= speed * dt; if (keys[rightKey]) this.vx += speed * dt;
+      if (keys[upKey]) this.vz -= speed * dt; if (keys[downKey]) this.vz += speed * dt;
+      if (keys[leftLegKey] && this.leftTimer <= 0) { this.leftLeg = 1; this.leftTimer = 0.3; }
+      if (keys[rightLegKey] && this.rightTimer <= 0) { this.rightLeg = 1; this.rightTimer = 0.3; }
+      checkPowerupPickup(this); }
+    if (this.leftTimer > 0) { this.leftTimer -= dt; if (this.leftTimer <= 0) { this.leftLeg = -1; setTimeout(() => { if (this.leftLeg === -1) this.leftLeg = 0; }, 100); } }
+    if (this.rightTimer > 0) { this.rightTimer -= dt; if (this.rightTimer <= 0) { this.rightLeg = -1; setTimeout(() => { if (this.rightLeg === -1) this.rightLeg = 0; }, 100); } }
+    this.x += (this.vx + this.knockVx) * dt; this.z += (this.vz + this.knockVz) * dt;
+    this.vx *= PLAYER_FRIC; this.vz *= PLAYER_FRIC; this.knockVx *= 0.9; this.knockVz *= 0.9;
+    if (Math.abs(this.knockVx) < 0.1) this.knockVx = 0; if (Math.abs(this.knockVz) < 0.1) this.knockVz = 0;
+    // 场地约束
+    const c = constrainToField(this.x, this.z, PLAYER_R);
+    this.x = c.x; this.z = c.z;
+    this.wrigglePhase += Math.sqrt(this.vx * this.vx + this.vz * this.vz) * dt * WRIGGLE_SPEED;
+    // 强力磁铁
+    if (this.buffs.magnet > 0) {
+      for (const b of balls) {
+        const mdx = this.x - b.mesh.position.x, mdz = this.z - b.mesh.position.z, md = Math.sqrt(mdx * mdx + mdz * mdz);
+        if (md < 10 && md > 0.3) { b.state.vx += (mdx / md) * 15 * dt; b.state.vz += (mdz / md) * 15 * dt; }
+      }
+    }
+  }
+  pushBall(bs, ball) { if (this.dead || this.buffs.frozen > 0) return;
+    const br = ball._radius;
+    const dx = ball.mesh.position.x - this.x, dy = ball.mesh.position.y - (this.y + 0.2), dz = ball.mesh.position.z - this.z, dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const pd = PLAYER_R + br + 0.1; if (dist < pd && dist > 0.01) { bs.lastTouch = this; const nx = dx / dist, ny = dy / dist, nz = dz / dist, o = pd - dist;
+      ball.mesh.position.x += nx * o; ball.mesh.position.y += ny * o; ball.mesh.position.z += nz * o;
+      bs.vx += nx * 6 + this.vx * 0.5; bs.vy += ny * 1.8 + 0.5; bs.vz += nz * 6 + this.vz * 0.5; } }
+  kickBall(bs, ball) { if (this.dead || this.buffs.frozen > 0) return;
+    const br = ball._radius;
+    const legs = this.getLegPositions();
+    const lf = { x: this.x + (-0.3 + Math.cos(legs.lAngle) * LEG_LEN * this.facing), y: this.y - 0.05 - Math.sin(legs.lAngle) * LEG_LEN, z: this.z - 0.35 };
+    const rf = { x: this.x + (-0.3 + Math.cos(legs.rAngle) * LEG_LEN * this.facing), y: this.y - 0.05 - Math.sin(legs.rAngle) * LEG_LEN, z: this.z + 0.35 };
+    this._kick(lf, bs, ball, this.leftLeg === 1, br); this._kick(rf, bs, ball, this.rightLeg === 1, br);
+    if (this.leftLeg === 1 && this.rightLeg === 1) { const cx = (lf.x + rf.x) / 2, cy = (lf.y + rf.y) / 2, cz = (lf.z + rf.z) / 2;
+      const dx = ball.mesh.position.x - cx, dy = ball.mesh.position.y - cy, dz = ball.mesh.position.z - cz;
+      if (Math.sqrt(dx * dx + dy * dy + dz * dz) < br + 0.8) { bs.vx *= 0.2; bs.vy *= 0.2; bs.vz *= 0.2; ball.mesh.position.x = cx; ball.mesh.position.y = cy + br + 0.05; ball.mesh.position.z = cz; } } }
+  _kick(foot, bs, ball, kicking, br) { const dx = ball.mesh.position.x - foot.x, dy = ball.mesh.position.y - foot.y, dz = ball.mesh.position.z - foot.z, dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (dist < br + 0.4 && kicking) { bs.lastTouch = this; const nd = dist || 1; const ra = (Math.random() - 0.5) * 1.2, cr = Math.cos(ra), sr = Math.sin(ra);
+      const dirX = dx / nd, dirZ = dz / nd; const km = this.buffs.bigKick > 0 ? 2.5 : 1.0;
+      bs.vx += (dirX * cr - dirZ * sr) * KICK_FORCE * km + this.vx * 0.2; bs.vy += 2.5 * km; bs.vz += (dirX * sr + dirZ * cr) * KICK_FORCE * km + this.vz * 0.2;
+      bs.spinX = (Math.random() - 0.5) * 8; bs.spinY = (Math.random() - 0.5) * 6; bs.spinZ = (Math.random() - 0.5) * 8; sndKick(); } }
+  collidePlayer(other) { if (this.dead || other.dead) return;
+    const dx = this.x - other.x, dz = this.z - other.z, dist = Math.sqrt(dx * dx + dz * dz), md = PLAYER_R * 1.8;
+    if (dist < md && dist > 0) { const nx = dx / dist, nz = dz / dist, o = md - dist;
+      this.x += nx * o * 0.5; other.x -= nx * o * 0.5; this.z += nz * o * 0.5; other.z -= nz * o * 0.5;
+      const rv = Math.sqrt((this.vx - other.vx) ** 2 + (this.vz - other.vz) ** 2);
+      if (rv > 0.5) { const kb = other.buffs.shield ? KNOCKBACK * 0.15 : KNOCKBACK, kbs = this.buffs.shield ? KNOCKBACK * 0.03 : KNOCKBACK * 0.15, f = Math.max(rv / 3, 1);
+        other.knockVx += -nx * kb * f + (this.vx - other.vx) * 0.6; other.knockVz += -nz * kb * f + (this.vz - other.vz) * 0.6;
+        this.knockVx += nx * kbs; this.knockVz += nz * kbs; } } }
+  updateMesh() { if (this.dead) return; const m = this.mesh;
+    m.group.position.set(this.x, this.y, this.z);
+    const s2d = Math.sqrt(this.vx * this.vx + this.vz * this.vz);
+    if (s2d > 0.3) m.group.rotation.y = -Math.atan2(this.vz, this.vx) + Math.PI / 2;
+    const wr = Math.sin(this.wrigglePhase) * 0.08 * Math.min(s2d / 2, 1);
+    m.body.rotation.y = wr; m.head.rotation.y = wr * 0.5;
+    const legs = this.getLegPositions();
+    m.leftLeg.position.set(-0.3, -0.05, -0.35); m.leftLeg.rotation.x = legs.lAngle;
+    m.rightLeg.position.set(-0.3, -0.05, 0.35); m.rightLeg.rotation.x = legs.rAngle;
+    m.leftFoot.position.set(-0.3 + Math.cos(legs.lAngle) * LEG_LEN * 0.5, -0.05 - Math.sin(legs.lAngle) * LEG_LEN * 0.5, -0.35);
+    m.rightFoot.position.set(-0.3 + Math.cos(legs.rAngle) * LEG_LEN * 0.5, -0.05 - Math.sin(legs.rAngle) * LEG_LEN * 0.5, 0.35);
+    const armSwing = Math.sin(this.wrigglePhase) * 0.4 * Math.min(s2d / 2, 1);
+    m.leftArm.rotation.x = armSwing; m.rightArm.rotation.x = -armSwing;
+    m.body.material.emissive = new THREE.Color(this.buffs.speed > 0 ? 0xffeb3b : 0x000000); m.body.material.emissiveIntensity = this.buffs.speed > 0 ? 0.3 : 0;
+    if (this.buffs.bigKick > 0) { m.leftLeg.material.emissive = new THREE.Color(0xff6d00); m.leftLeg.material.emissiveIntensity = 0.4; m.rightLeg.material.emissive = new THREE.Color(0xff6d00); m.rightLeg.material.emissiveIntensity = 0.4; }
+    else { m.leftLeg.material.emissive = new THREE.Color(0x000000); m.leftLeg.material.emissiveIntensity = 0; m.rightLeg.material.emissive = new THREE.Color(0x000000); m.rightLeg.material.emissiveIntensity = 0; }
+    if (this.invincible > 0) { const blink = Math.sin(Date.now() * 0.01) > 0; m.body.material.emissive = blink ? new THREE.Color(0xffd700) : new THREE.Color(0x000000); m.body.material.emissiveIntensity = blink ? 0.6 : 0; }
+    updateHPBar(this);
+  }
+}
+
+// ===== 创建4个玩家 =====
+const p1Mesh = createPlayer(0x4fc3f7, '1'), p2Mesh = createPlayer(0xef5350, '2');
+const ai1Mesh = createPlayer(0x81d4fa, '3'), ai2Mesh = createPlayer(0xef9a9a, '4');
+// 根据球门位置设置起始点
+const gs1 = goalSegments.find(g => g.team === 1);
+const gs2 = goalSegments.find(g => g.team === 2);
+const p1StartX = gs2 ? -gs2.cx * 0.3 : -6;
+const p1StartZ = gs2 ? -gs2.cz * 0.3 : 0;
+const p2StartX = gs1 ? -gs1.cx * 0.3 : 6;
+const p2StartZ = gs1 ? -gs1.cz * 0.3 : 0;
+const p1 = new PlayerState(p1Mesh, p1StartX, p1StartZ, 1, 0x4fc3f7, 1);
+const p2 = new PlayerState(p2Mesh, p2StartX, p2StartZ, -1, 0xef5350, 2);
+const ai1 = new PlayerState(ai1Mesh, p1StartX * 0.5, p1StartZ + 3, 1, 0x81d4fa, 1, true);
+const ai2 = new PlayerState(ai2Mesh, p2StartX * 0.5, p2StartZ - 3, -1, 0xef9a9a, 2, true);
+const allPlayers = [p1, p2, ai1, ai2];
+
+// ===== 游戏状态 =====
+const gameState = { score: [0, 0], kills: [0, 0], started: false, goalPause: 0, victory: false };
+
+// ===== 音效 =====
+let audioCtx;
+function initAudio() { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+function playTone(freq, dur, type = 'sine', vol = 0.15) {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = type; o.frequency.value = freq; g.gain.setValueAtTime(vol, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + dur);
+}
+function sndKick() { playTone(120, 0.08, 'sine', 0.2); }
+function sndGoal() { playTone(523, 0.15, 'sine', 0.2); setTimeout(() => playTone(659, 0.15, 'sine', 0.2), 150); setTimeout(() => playTone(784, 0.3, 'sine', 0.2), 300); }
+function sndKill() { playTone(200, 0.15, 'square', 0.1); }
+function sndBomb() { playTone(80, 0.3, 'sine', 0.2); playTone(60, 0.4, 'sawtooth', 0.1); }
+function sndPickup() { playTone(880, 0.08, 'sine', 0.1); setTimeout(() => playTone(1100, 0.08, 'sine', 0.1), 80); }
+function sndGun() { playTone(400, 0.05, 'square', 0.08); }
+function sndSniper() { playTone(800, 0.1, 'sawtooth', 0.12); }
+function sndZap() { playTone(2000, 0.15, 'sawtooth', 0.1); }
+function sndNuke() { playTone(40, 0.8, 'sine', 0.3); playTone(60, 1.0, 'sawtooth', 0.15); }
+
+// ===== 背景音乐（激烈版）=====
+let bgMusicOn = false, bgBeatIdx = 0, bgBeatTimer = 0;
+const BG_BPM = 200;
+const BG_BEAT_LEN = 60 / BG_BPM;
+// 16拍循环模式 - 更密集激烈
+const kickPattern  = [1,1,0,1, 1,0,1,1, 1,1,0,1, 1,0,1,1];
+const snarePattern = [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,1,1,0];
+const hhPattern    = [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1];
+const bassNotes    = [55,55,65,55, 82,73,55,65, 55,55,82,55, 98,82,73,65];
+const leadNotes    = [440,0,523,0, 659,0,523,440, 0,659,0,784, 880,659,523,440];
+const leadNotes2   = [0,330,0,392, 0,523,0,392, 330,0,392,0, 523,440,392,330];
+function updateBGMusic(dt) {
+  if (!bgMusicOn || !audioCtx) return;
+  bgBeatTimer -= dt;
+  if (bgBeatTimer <= 0) {
+    const i = bgBeatIdx % 16;
+    // 底鼓 - 更重
+    if (kickPattern[i]) { playTone(45, 0.12, 'sine', 0.2); playTone(30, 0.08, 'sine', 0.15); }
+    // 军鼓 - 更猛
+    if (snarePattern[i]) { playTone(250, 0.05, 'triangle', 0.12); playTone(1200, 0.03, 'square', 0.06); playTone(6000, 0.02, 'square', 0.04); }
+    // Hi-hat - 更密
+    if (hhPattern[i]) playTone(10000, 0.015, 'square', 0.03);
+    // 贝斯线 - 更深
+    if (bassNotes[i]) playTone(bassNotes[i], 0.12, 'sawtooth', 0.1);
+    // 旋律线1
+    if (leadNotes[i]) playTone(leadNotes[i], 0.1, 'square', 0.04);
+    // 旋律线2
+    if (leadNotes2[i]) playTone(leadNotes2[i], 0.08, 'sawtooth', 0.03);
+    bgBeatIdx++;
+    bgBeatTimer = BG_BEAT_LEN;
+  }
+}
+
+// ===== 输入 =====
+const keys = {};
+document.addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if (!gameState.started) { gameState.started = true; document.getElementById('startMsg').style.display = 'none'; initAudio(); bgMusicOn = true; }
+  if (e.key.toLowerCase() === 'p' && gameState.victory) restartGame();
+});
+document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+// ===== 进球检测 =====
+function goal(team, scoringBall) {
+  gameState.score[team - 1]++;
+  document.getElementById('s1').textContent = gameState.score[0];
+  document.getElementById('s2').textContent = gameState.score[1];
+  const msg = document.getElementById('goalMsg');
+  const lastTouch = scoringBall.state.lastTouch;
+  msg.textContent = lastTouch ? `⚽ ${lastTouch === p1 ? 'P1' : lastTouch === p2 ? 'P2' : lastTouch === ai1 ? 'AI1' : 'AI2'} 进球! 队${team}得分!` : `⚽ 队${team}得分!`;
+  msg.classList.add('show'); setTimeout(() => msg.classList.remove('show'), 2000);
+  sndGoal(); gameState.goalPause = 1.0;
+  // 只重置进门的球，不清除其他球（多球可累计）
+  resetBall(scoringBall);
+  // 检查胜利
+  if (gameState.score[team - 1] >= WIN_SCORE) showVictory(team);
+}
+
+function checkBallGoal(ball) {
+  const br = ball._radius;
+  for (const gs of goalSegments) {
+    const edge = fieldEdges[gs.edgeIdx];
+    const sd = signedDistToEdge(ball.mesh.position.x, ball.mesh.position.z, edge);
+    if (sd < br) {
+      const t = projectOnEdge(ball.mesh.position.x, ball.mesh.position.z, edge);
+      if (t >= gs.t1 && t <= gs.t2 && ball.mesh.position.y < GOAL_H) {
+        goal(gs.team, ball); return true;
+      }
+    }
+  }
+  return false;
+}
+
+// ===== 胜利 =====
+const fireworks = [];
+function showVictory(team) {
+  gameState.victory = true;
+  const ov = document.getElementById('victoryOverlay');
+  document.getElementById('victoryText').innerHTML = `<span class="team${team}">队${team} 胜利!</span>`;
+  document.getElementById('victorySub').textContent = `${gameState.score[0]} : ${gameState.score[1]}`;
+  ov.classList.add('show');
+  sndGoal(); setTimeout(sndGoal, 300); setTimeout(sndGoal, 600);
+  // 烟花
+  for (let i = 0; i < 10; i++) setTimeout(() => spawnFirework(), i * 400);
+}
+function spawnFirework() {
+  const x = (Math.random() - 0.5) * 20, z = (Math.random() - 0.5) * 20;
+  const colors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xff8800];
+  for (let i = 0; i < 30; i++) {
+    const c = colors[Math.floor(Math.random() * colors.length)];
+    const p = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), new THREE.MeshBasicMaterial({ color: c }));
+    p.position.set(x, 5 + Math.random() * 5, z); scene.add(p);
+    const a = Math.random() * Math.PI * 2, elev = Math.random() * Math.PI * 0.8, s = 5 + Math.random() * 8;
+    fireworks.push({ mesh: p, vx: Math.cos(a) * Math.cos(elev) * s, vy: Math.sin(elev) * s + 3, vz: Math.sin(a) * Math.cos(elev) * s, life: 1.5 + Math.random() });
+  }
+}
+function updateFireworks(dt) {
+  for (let i = fireworks.length - 1; i >= 0; i--) {
+    const f = fireworks[i]; f.life -= dt;
+    if (f.life <= 0) { scene.remove(f.mesh); fireworks.splice(i, 1); continue; }
+    f.vy -= 8 * dt; f.mesh.position.x += f.vx * dt; f.mesh.position.y += f.vy * dt; f.mesh.position.z += f.vz * dt;
+    f.mesh.scale.setScalar(Math.min(f.life, 1));
+  }
+}
+function restartGame() {
+  gameState.score = [0, 0]; gameState.kills = [0, 0]; gameState.victory = false; gameState.goalPause = 0;
+  document.getElementById('s1').textContent = '0'; document.getElementById('s2').textContent = '0';
+  document.getElementById('victoryOverlay').classList.remove('show');
+  for (const p of allPlayers) { p.dead = false; p.hp = MAX_HP; p.invincible = 0; p.heldPowerup = null; p.buffs = { speed: 0, frozen: 0, bigKick: 0, magnet: 0, shield: 0 }; p.speedMultiplier = 1.0; p.gunAmmo = 0; p.sniperAmmo = 0; p.grenadeAmmo = 99999999999; p.reset(); p.mesh.group.visible = true; }
+  for (const b of balls) resetBall(b);
+  for (const f of fireworks) scene.remove(f.mesh); fireworks.length = 0;
+  for (const b of bosses) scene.remove(b.mesh.group); bosses.length = 0;
+  removeFreezeEffect; removeShieldEffect;
+}
+
+// ===== Buff栏UI =====
+function updateBuffBar() {
+  for (let t = 0; t < 2; t++) {
+    const players = allPlayers.filter(p => p.team === t + 1);
+    const el = document.getElementById(t === 0 ? 'buffLeft' : 'buffRight');
+    let html = `<div class="buff-label" style="color:${t === 0 ? '#4fc3f7' : '#ef5350'}">队${t + 1}</div>`;
+    for (const p of players) {
+      const name = p === p1 ? 'P1' : p === p2 ? 'P2' : p === ai1 ? 'AI1' : 'AI2';
+      html += '<div class="buff-row">';
+      if (p.heldPowerup) { const pt = POWERUP_TYPES[p.heldPowerup]; html += `<div class="buff-icon" style="border:1px solid #fff"><span>${pt.icon}</span></div>`; }
+      if (p.gunAmmo > 0) html += `<div class="buff-icon" style="background:rgba(96,125,139,0.7)"><span>🔫</span><span class="ammo-count">${p.gunAmmo}</span></div>`;
+      if (p.sniperAmmo > 0) html += `<div class="buff-icon" style="background:rgba(38,50,56,0.7)"><span>🎯</span><span class="ammo-count">${p.sniperAmmo}</span></div>`;
+      if (p.grenadeAmmo > 0) html += `<div class="buff-icon" style="background:rgba(121,85,72,0.7)"><span>🎗️</span><span class="ammo-count">${p.grenadeAmmo}</span></div>`;
+      for (const [key, val] of Object.entries(p.buffs)) { if (val > 0) { const pt = POWERUP_TYPES[key]; if (pt) html += `<div class="buff-icon"><span>${pt.icon}</span><div class="fill" style="height:${(val / pt.duration) * 100}%"></div></div>`; } }
+      html += '</div>';
+    }
+    el.innerHTML = html;
+  }
+}
+
+// ===== 球物理 =====
+function updateBallPhysics(ball, dt) {
+  const br = ball._radius;
+  const s = ball.state;
+  s.vy += GRAVITY * dt;
+  s.vx *= BALL_FRIC; s.vz *= BALL_FRIC;
+  if (ball.mesh.position.y <= br + 0.05) { s.vx *= BALL_GROUND_FRIC; s.vz *= BALL_GROUND_FRIC; }
+  ball.mesh.position.x += s.vx * dt; ball.mesh.position.y += s.vy * dt; ball.mesh.position.z += s.vz * dt;
+  if (ball.mesh.position.y < br) { ball.mesh.position.y = br; if (s.vy < -0.5) s.vy *= -0.5; else s.vy = 0; }
+  s.vx += s.spinZ * MAGNUS_FACTOR * dt; s.vz -= s.spinX * MAGNUS_FACTOR * dt;
+  s.spinX *= 0.995; s.spinY *= 0.995; s.spinZ *= 0.995;
+  ball.mesh.rotation.x += s.spinX * dt; ball.mesh.rotation.y += s.spinY * dt; ball.mesh.rotation.z += s.spinZ * dt;
+  for (const e of fieldEdges) {
+    const sd = signedDistToEdge(ball.mesh.position.x, ball.mesh.position.z, e);
+    if (sd < br) {
+      const ei = fieldEdges.indexOf(e);
+      let scored = false;
+      for (const gs of goalSegments) {
+        if (gs.edgeIdx !== ei) continue;
+        const t = projectOnEdge(ball.mesh.position.x, ball.mesh.position.z, e);
+        if (t >= gs.t1 && t <= gs.t2 && ball.mesh.position.y < GOAL_H) { goal(gs.team, ball); scored = true; return; }
+      }
+      if (scored) return;
+      const dot = s.vx * e.nx + s.vz * e.nz;
+      s.vx -= 2 * dot * e.nx; s.vz -= 2 * dot * e.nz;
+      ball.mesh.position.x += e.nx * (br - sd); ball.mesh.position.z += e.nz * (br - sd);
+      s.spinX += (Math.random() - 0.5) * 2; s.spinZ += (Math.random() - 0.5) * 2;
+      break;
+    }
+  }
+  const spd = Math.sqrt(s.vx * s.vx + s.vz * s.vz);
+  if (spd < 0.3) s.stuckTimer += dt; else s.stuckTimer = 0;
+  if (s.stuckTimer > 4) { s.vx += (Math.random() - 0.5) * 5; s.vz += (Math.random() - 0.5) * 5; s.stuckTimer = 0; }
+}
+
+// ===== 主循环 =====
+let lastTime = 0;
+function animate(time) {
+  requestAnimationFrame(animate);
+  const dt = Math.min((time - lastTime) / 1000, 0.05); lastTime = time;
+  if (!gameState.started || gameState.victory) { renderer.render(scene, camera); return; }
+  if (gameState.goalPause > 0) { gameState.goalPause -= dt; renderer.render(scene, camera); return; }
+  p1.update(dt, 'a', 'd', 'w', 's', 'j', 'k');
+  p2.update(dt, 'arrowleft', 'arrowright', 'arrowup', 'arrowdown', '1', '2');
+  ai1.update(dt); ai2.update(dt);
+  if (!p1.dead && keys[' '] && p1.heldPowerup) { activatePowerup(p1, p1.heldPowerup); p1.heldPowerup = null; }
+  if (!p1.dead && keys['e'] && p1.gunAmmo > 0) { p1.gunFireTimer -= dt; if (p1.gunFireTimer <= 0) { fireBullet(p1); p1.gunFireTimer = 0.12; } }
+  if (!p1.dead && keys['q'] && p1.sniperAmmo > 0 && !p1._sniperFired) { fireSniper(p1); p1._sniperFired = true; }
+  if (!keys['q']) p1._sniperFired = false;
+  if (!p1.dead && keys['r']) activateGrenade(p1);
+  if (!p2.dead && keys['/'] && p2.heldPowerup) { activatePowerup(p2, p2.heldPowerup); p2.heldPowerup = null; }
+  if (!p2.dead && keys['.'] && p2.gunAmmo > 0) { p2.gunFireTimer -= dt; if (p2.gunFireTimer <= 0) { fireBullet(p2); p2.gunFireTimer = 0.12; } }
+  if (!p2.dead && keys[','] && p2.sniperAmmo > 0 && !p2._sniperFired) { fireSniper(p2); p2._sniperFired = true; }
+  if (!keys[',']) p2._sniperFired = false;
+  if (!p2.dead && keys['0']) activateGrenade(p2);
+  for (let i = balls.length - 1; i >= 0; i--) {
+    const ball = balls[i];
+    // 多球不消失，无timer
+    updateBallPhysics(ball, dt);
+    for (const p of allPlayers) { if (!p.dead) { p.pushBall(ball.state, ball); p.kickBall(ball.state, ball); } }
+  }
+  for (let i = 0; i < allPlayers.length; i++) for (let j = i + 1; j < allPlayers.length; j++) allPlayers[i].collidePlayer(allPlayers[j]);
+  updateBullets(dt); updateSniperRounds(dt); updateRockets(dt); updateGrenades(dt);
+  updateZapBeams(dt); updateExplosions(dt); updateFireworks(dt); updateBosses(dt);
+  updatePowerups(dt); updateBuffs(dt); updateDead(dt);
+  updateAimLines(); updateBGMusic(dt);
+  for (const p of allPlayers) p.updateMesh();
+  updateRespawnUI(); updateBuffBar();
+  if (nukeFlash) { nukeFlash.life -= dt; if (nukeFlash.life <= 0) nukeFlash = null; }
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
