@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
@@ -82,6 +82,24 @@
     display: flex; justify-content: center; gap: 20px;
   }
   .respawn-tag { font-size: 18px; font-weight: bold; padding: 2px 12px; border-radius: 6px; background: rgba(0,0,0,0.6); }
+  #multiplayerPanel {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85); z-index: 100;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #fff; gap: 16px;
+  }
+  #multiplayerPanel h2 { font-size: 32px; margin-bottom: 10px; }
+  #multiplayerPanel input {
+    padding: 10px 16px; font-size: 18px; border-radius: 8px; border: none;
+    width: 260px; text-align: center;
+  }
+  #multiplayerPanel button {
+    padding: 10px 24px; font-size: 16px; border-radius: 8px; border: none;
+    cursor: pointer; background: #4fc3f7; color: #000; font-weight: bold;
+  }
+  #multiplayerPanel button:hover { background: #29b6f6; }
+  #multiplayerPanel #roomStatus { color: #aaa; font-size: 14px; min-height: 20px; }
+  #multiplayerPanel .mode-btns { display: flex; gap: 12px; }
 </style>
 </head>
 <body>
@@ -103,6 +121,18 @@
   <div class="ctrl"><b style="color:#4fc3f7">P1</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>爬行 <kbd>J</kbd>左腿 <kbd>K</kbd>右腿 <kbd>Space</kbd>使用道具 <kbd>E</kbd>冲锋枪 <kbd>Q</kbd>狙击枪 <kbd>R</kbd>手雷</div>
   <div class="ctrl"><b style="color:#ef5350">P2</b> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>爬行 <kbd>1</kbd>左腿 <kbd>2</kbd>右腿 <kbd>/</kbd>使用道具 <kbd>.</kbd>冲锋枪 <kbd>,</kbd>狙击枪 <kbd>0</kbd>手雷</div>
 </div>
+<div id="multiplayerPanel">
+  <h2>躺平足球3D 联机版</h2>
+  <div class="mode-btns">
+    <button id="btnLocal">单人/本地双人</button>
+    <button id="btnCreate">创建房间</button>
+    <button id="btnJoin">加入房间</button>
+  </div>
+  <input id="roomInput" type="text" placeholder="输入房间号" maxlength="10" />
+  <button id="btnConfirm">确认</button>
+  <div id="roomStatus"></div>
+</div>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script type="importmap">
 { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
 </script>
@@ -127,7 +157,7 @@ const INVINCIBLE_TIME = 3;
 const MAX_HP = 100;
 const BOUNCE_MAX = 1023;
 const WIN_SCORE = 11;
-const GOAL_W = 4, GOAL_H = 2.5, GOAL_D = 1.5;
+const GOAL_W = 7.32, GOAL_H = 2.44, GOAL_D = 1.5;
 
 // 伤害值
 const DMG_GUN = 3;
@@ -140,7 +170,7 @@ const DMG_NUKE = 999;
 
 // ===== 随机封闭场地 =====
 const NUM_SIDES = 7 + Math.floor(Math.random() * 5); // 7-11边
-const BASE_RADIUS = 26; // 面积约3倍
+const BASE_RADIUS = 26;
 const fieldVerts = []; // {x, z}
 const fieldEdges = []; // {ax,az,bx,bz,nx,nz,dx,dz,len,lenSq,isGoal,goalTeam,goalT1,goalT2}
 const goalSegments = []; // {edgeIdx, t1, t2, team, cx, cz, onx, onz} — 独立球门段
@@ -175,13 +205,15 @@ function computeEdges() {
     const nx = -dz / len, nz = dx / len;
     fieldEdges.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, nx, nz, dx: dx / len, dz: dz / len, len, lenSq: len * len, isGoal: false, goalTeam: 0, goalT1: 0, goalT2: 0 });
   }
-  // 随机2-100个球门，沿周长均匀分布（允许同一位置有多个球门）
-  const NUM_GOALS = 2 + Math.floor(Math.random() * 99);
+  // 随机多个球门，不重叠
   const totalPerimeter = fieldEdges.reduce((s, e) => s + e.len, 0);
+  const NUM_GOALS = 2;
   const GOAL_W_ABS = Math.min(GOAL_W, totalPerimeter / (NUM_GOALS * 3));
-  for (let gi = 0; gi < NUM_GOALS; gi++) {
-    const perimeterPos = (gi + 0.5) / NUM_GOALS * totalPerimeter;
-    // 找到对应的边
+  const usedRanges = []; // 记录已用位置（以t为单位）
+  let attempts = 0;
+  while (goalSegments.length < NUM_GOALS && attempts < 300) {
+    attempts++;
+    const perimeterPos = Math.random() * totalPerimeter;
     let accum = 0, edgeIdx = 0, t = 0;
     for (let ei = 0; ei < NUM_SIDES; ei++) {
       if (accum + fieldEdges[ei].len > perimeterPos) { edgeIdx = ei; t = (perimeterPos - accum) / fieldEdges[ei].len; break; }
@@ -191,21 +223,32 @@ function computeEdges() {
     const edge = fieldEdges[edgeIdx];
     const halfW = (GOAL_W_ABS / 2) / edge.len;
     const t1 = Math.max(0.02, t - halfW), t2 = Math.min(0.98, t + halfW);
-    if (t2 - t1 < 0.04) continue; // 太小跳过
-    const team = (gi % 2) + 1; // 交替分配队伍
+    if (t2 - t1 < 0.04) continue;
+    // 检查是否和已有球门重叠
+    let overlap = false;
+    for (const u of usedRanges) {
+      if (u.edgeIdx === edgeIdx && !(t2 < u.t1 || t1 > u.t2)) { overlap = true; break; }
+    }
+    if (overlap) continue;
+    const team = (goalSegments.length % 2) + 1; // 交替分配队伍
     const cx = edge.ax + edge.dx * edge.len * ((t1 + t2) / 2);
     const cz = edge.az + edge.dz * edge.len * ((t1 + t2) / 2);
-    const onx = -edge.nx, onz = -edge.nz; // 外法线
+    const onx = -edge.nx, onz = -edge.nz;
     goalSegments.push({ edgeIdx, t1, t2, team, cx, cz, onx, onz });
-    edge.isGoal = true; // 标记边含球门
+    usedRanges.push({ edgeIdx, t1, t2 });
+    edge.isGoal = true;
   }
-  // 允许重叠：额外随机复制一些球门到已有位置（不同队伍）
-  const overlapCount = Math.floor(NUM_GOALS * 0.3);
-  for (let oi = 0; oi < overlapCount; oi++) {
-    const src = goalSegments[Math.floor(Math.random() * goalSegments.length)];
-    const flipTeam = src.team === 1 ? 2 : 1;
-    goalSegments.push({ ...src, team: flipTeam });
+}
+
+let FIELD_W = BASE_RADIUS, FIELD_H = BASE_RADIUS;
+function updateFieldBounds() {
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const v of fieldVerts) {
+    minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x);
+    minZ = Math.min(minZ, v.z); maxZ = Math.max(maxZ, v.z);
   }
+  FIELD_W = (maxX - minX) / 2;
+  FIELD_H = (maxZ - minZ) / 2;
 }
 
 function isInsidePolygon(x, z) {
@@ -238,6 +281,7 @@ function constrainToField(x, z, radius) {
 
 generateField();
 computeEdges();
+updateFieldBounds();
 
 // ===== 渲染器 =====
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -247,10 +291,8 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-const fieldHue = 0.25 + Math.random() * 0.12;
-const fieldBaseColor = new THREE.Color().setHSL(fieldHue, 0.5 + Math.random() * 0.3, 0.15 + Math.random() * 0.15);
-scene.background = fieldBaseColor.clone().multiplyScalar(0.6);
-scene.fog = new THREE.Fog(scene.background, 50, 90);
+scene.background = new THREE.Color(0x1a3d1a);
+scene.fog = new THREE.Fog(scene.background, 50, 120);
 
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 150);
 camera.position.set(0, 35, 35);
@@ -265,11 +307,11 @@ window.addEventListener('resize', () => {
 // ===== 灯光 =====
 scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 const dir = new THREE.DirectionalLight(0xfff5e0, 1.2);
-dir.position.set(8, 25, 10);
+dir.position.set(0, 40, 20);
 dir.castShadow = true;
 dir.shadow.mapSize.set(2048, 2048);
-dir.shadow.camera.left = -30; dir.shadow.camera.right = 30;
-dir.shadow.camera.top = 25; dir.shadow.camera.bottom = -25;
+dir.shadow.camera.left = -60; dir.shadow.camera.right = 60;
+dir.shadow.camera.top = 40; dir.shadow.camera.bottom = -40;
 scene.add(dir);
 
 // ===== 场地网格 =====
@@ -278,85 +320,69 @@ fieldShape.moveTo(fieldVerts[0].x, fieldVerts[0].z);
 for (let i = 1; i < NUM_SIDES; i++) fieldShape.lineTo(fieldVerts[i].x, fieldVerts[i].z);
 fieldShape.closePath();
 const fieldGeo = new THREE.ShapeGeometry(fieldShape);
-const fieldMesh = new THREE.Mesh(fieldGeo, new THREE.MeshStandardMaterial({ color: fieldBaseColor, roughness: 0.9 }));
+const fieldMat = new THREE.MeshStandardMaterial({ color: 0x2d7a2d, roughness: 0.9 });
+const fieldMesh = new THREE.Mesh(fieldGeo, fieldMat);
 fieldMesh.rotation.x = -Math.PI / 2; fieldMesh.receiveShadow = true; scene.add(fieldMesh);
 
-// 条纹
-for (let i = 0; i < NUM_SIDES; i++) {
-  const v = fieldVerts[i], vn = fieldVerts[(i + 1) % NUM_SIDES];
-  const mx = (v.x + vn.x) / 2, mz = (v.z + vn.z) / 2;
-  if (i % 2 === 0) {
-    const stripe = new THREE.Mesh(new THREE.PlaneGeometry(vn.x === v.x ? 1 : Math.abs(vn.x - v.x) * 0.3, Math.sqrt((vn.x - v.x) ** 2 + (vn.z - v.z) ** 2)),
-      new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(fieldHue, 0.5, 0.13 + Math.random() * 0.05), roughness: 0.9 }));
-    stripe.rotation.x = -Math.PI / 2;
-    stripe.position.set(mx * 0.5, 0.01, mz * 0.5);
-    stripe.receiveShadow = true;
-    scene.add(stripe);
-  }
+// 草地条纹
+const stripeCount = Math.min(10, NUM_SIDES);
+for (let i = 0; i < stripeCount; i++) {
+  const a = fieldVerts[i], b = fieldVerts[(i + 1) % NUM_SIDES];
+  const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+  const stripe = new THREE.Mesh(
+    new THREE.PlaneGeometry(BASE_RADIUS * 0.4, BASE_RADIUS * 0.4),
+    new THREE.MeshStandardMaterial({ color: i % 2 === 0 ? 0x257025 : 0x2d7a2d, roughness: 0.9 })
+  );
+  stripe.rotation.x = -Math.PI / 2;
+  stripe.position.set(mx, 0.01, mz);
+  stripe.receiveShadow = true;
+  scene.add(stripe);
 }
 
-// ===== 白色描边 =====
-const outlinePts = fieldVerts.map(v => new THREE.Vector3(v.x, 0.05, v.z));
-outlinePts.push(outlinePts[0].clone());
-const outlineLine = new THREE.Line(
-  new THREE.BufferGeometry().setFromPoints(outlinePts),
-  new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 })
-);
-scene.add(outlineLine);
-// 加粗描边 - 用管道
-const outlineCurve = new THREE.CatmullRomCurve3(outlinePts.slice(0, -1).map(p => new THREE.Vector3(p.x, 0.1, p.z)), true);
-const tubeGeo = new THREE.TubeGeometry(outlineCurve, NUM_SIDES * 4, 0.12, 6, true);
-const tubeMesh = new THREE.Mesh(tubeGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 }));
-tubeMesh.castShadow = true; scene.add(tubeMesh);
+// 场地边界白线
+const lineMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+for (let i = 0; i < NUM_SIDES; i++) {
+  const a = fieldVerts[i], b = fieldVerts[(i + 1) % NUM_SIDES];
+  const dx = b.x - a.x, dz = b.z - a.z;
+  const len = Math.sqrt(dx * dx + dz * dz);
+  const line = new THREE.Mesh(new THREE.BoxGeometry(len, 0.02, 0.12), lineMat);
+  line.position.set((a.x + b.x) / 2, 0.05, (a.z + b.z) / 2);
+  line.rotation.y = -Math.atan2(dz, dx);
+  scene.add(line);
+}
 
-// 中心白色圆圈
-const CENTER_CIRCLE_R = 5;
-const centerCircleGeo = new THREE.TorusGeometry(CENTER_CIRCLE_R, 0.1, 8, 48);
-const centerCircleMesh = new THREE.Mesh(centerCircleGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 }));
-centerCircleMesh.rotation.x = -Math.PI / 2; centerCircleMesh.position.y = 0.05; centerCircleMesh.castShadow = true;
-scene.add(centerCircleMesh);
-
-// ===== 球门（足球门样式：横梁+立柱+网）=====
+// ===== 球门（真实足球门：立柱+横梁+后框+完整网）=====
 function makePolygonGoal(gs) {
   const edge = fieldEdges[gs.edgeIdx];
   const g = new THREE.Group();
   const teamColor = gs.team === 1 ? 0x4fc3f7 : 0xef5350;
   const postMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.8, roughness: 0.2 });
-  const netMat = new THREE.MeshStandardMaterial({ color: teamColor, transparent: true, opacity: 0.2, side: THREE.DoubleSide, wireframe: true });
+  const netMat = new THREE.MeshStandardMaterial({ color: teamColor, transparent: true, opacity: 0.25, side: THREE.DoubleSide, wireframe: true });
   const netSolidMat = new THREE.MeshStandardMaterial({ color: teamColor, transparent: true, opacity: 0.08, side: THREE.DoubleSide });
   const t1 = gs.t1 * edge.len, t2 = gs.t2 * edge.len;
   const goalLen = t2 - t1;
   const gx1 = edge.ax + edge.dx * t1, gz1 = edge.az + edge.dz * t1;
   const gx2 = edge.ax + edge.dx * t2, gz2 = edge.az + edge.dz * t2;
   const onx = gs.onx, onz = gs.onz;
-  const postR = 0.08;
+  const postR = 0.1;
 
-  // 左立柱
-  const leftPost = new THREE.Mesh(new THREE.CylinderGeometry(postR, postR, GOAL_H, 8), postMat);
-  leftPost.position.set(gx1, GOAL_H / 2, gz1); leftPost.castShadow = true; g.add(leftPost);
-  // 左立柱顶球
-  const leftCap = new THREE.Mesh(new THREE.SphereGeometry(postR * 1.5, 8, 8), postMat);
-  leftCap.position.set(gx1, GOAL_H, gz1); g.add(leftCap);
-
-  // 右立柱
-  const rightPost = new THREE.Mesh(new THREE.CylinderGeometry(postR, postR, GOAL_H, 8), postMat);
-  rightPost.position.set(gx2, GOAL_H / 2, gz2); rightPost.castShadow = true; g.add(rightPost);
-  // 右立柱顶球
-  const rightCap = new THREE.Mesh(new THREE.SphereGeometry(postR * 1.5, 8, 8), postMat);
-  rightCap.position.set(gx2, GOAL_H, gz2); g.add(rightCap);
-
-  // 横梁
   const barCx = (gx1 + gx2) / 2, barCz = (gz1 + gz2) / 2;
   const barAngle = Math.atan2(gz2 - gz1, gx2 - gx1);
+  const backLeftX = gx1 + onx * GOAL_D, backLeftZ = gz1 + onz * GOAL_D;
+  const backRightX = gx2 + onx * GOAL_D, backRightZ = gz2 + onz * GOAL_D;
+  const backBarCx = barCx + onx * GOAL_D, backBarCz = barCz + onz * GOAL_D;
+
+  // 前左立柱
+  const leftPost = new THREE.Mesh(new THREE.CylinderGeometry(postR, postR, GOAL_H, 8), postMat);
+  leftPost.position.set(gx1, GOAL_H / 2, gz1); leftPost.castShadow = true; g.add(leftPost);
+  // 前右立柱
+  const rightPost = new THREE.Mesh(new THREE.CylinderGeometry(postR, postR, GOAL_H, 8), postMat);
+  rightPost.position.set(gx2, GOAL_H / 2, gz2); rightPost.castShadow = true; g.add(rightPost);
+  // 前横梁
   const crossbar = new THREE.Mesh(new THREE.CylinderGeometry(postR, postR, goalLen, 8), postMat);
   crossbar.rotation.z = Math.PI / 2;
   crossbar.rotation.y = -barAngle + Math.PI / 2;
   crossbar.position.set(barCx, GOAL_H, barCz); crossbar.castShadow = true; g.add(crossbar);
-
-  // 后框 - 两根后立柱 + 后横梁
-  const backLeftX = gx1 + onx * GOAL_D, backLeftZ = gz1 + onz * GOAL_D;
-  const backRightX = gx2 + onx * GOAL_D, backRightZ = gz2 + onz * GOAL_D;
-  const backBarCx = barCx + onx * GOAL_D, backBarCz = barCz + onz * GOAL_D;
 
   // 后左立柱
   const blPost = new THREE.Mesh(new THREE.CylinderGeometry(postR * 0.7, postR * 0.7, GOAL_H, 8), postMat);
@@ -370,68 +396,50 @@ function makePolygonGoal(gs) {
   backBar.rotation.y = -barAngle + Math.PI / 2;
   backBar.position.set(backBarCx, GOAL_H, backBarCz); g.add(backBar);
 
-  // 顶部连接梁（左前→左后、右前→右后）
-  const topLeftBar = new THREE.Mesh(new THREE.CylinderGeometry(postR * 0.5, postR * 0.5, GOAL_D, 8), postMat);
-  const tlp = new THREE.Vector3(gx1, GOAL_H, gz1);
-  const tlp2 = new THREE.Vector3(backLeftX, GOAL_H, backLeftZ);
-  topLeftBar.position.copy(tlp.clone().add(tlp2).multiplyScalar(0.5));
-  const tlDir = tlp2.clone().sub(tlp);
-  topLeftBar.lookAt(tlp2);
-  topLeftBar.rotateX(Math.PI / 2);
-  g.add(topLeftBar);
+  // 顶部连接梁
+  function addBar(p1, p2, r) {
+    const len = p1.distanceTo(p2);
+    const bar = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 8), postMat);
+    bar.position.copy(p1.clone().add(p2).multiplyScalar(0.5));
+    bar.lookAt(p2); bar.rotateX(Math.PI / 2);
+    g.add(bar);
+  }
+  addBar(new THREE.Vector3(gx1, GOAL_H, gz1), new THREE.Vector3(backLeftX, GOAL_H, backLeftZ), postR * 0.5);
+  addBar(new THREE.Vector3(gx2, GOAL_H, gz2), new THREE.Vector3(backRightX, GOAL_H, backRightZ), postR * 0.5);
 
-  const topRightBar = new THREE.Mesh(new THREE.CylinderGeometry(postR * 0.5, postR * 0.5, GOAL_D, 8), postMat);
-  const trp = new THREE.Vector3(gx2, GOAL_H, gz2);
-  const trp2 = new THREE.Vector3(backRightX, GOAL_H, backRightZ);
-  topRightBar.position.copy(trp.clone().add(trp2).multiplyScalar(0.5));
-  topRightBar.lookAt(trp2);
-  topRightBar.rotateX(Math.PI / 2);
-  g.add(topRightBar);
-
-  // 网 - 后面
-  const backNet = new THREE.Mesh(new THREE.PlaneGeometry(goalLen, GOAL_H, Math.ceil(goalLen), Math.ceil(GOAL_H)), netMat);
+  // 后网
+  const backNet = new THREE.Mesh(new THREE.PlaneGeometry(goalLen, GOAL_H, Math.ceil(goalLen * 1.5), Math.ceil(GOAL_H * 1.5)), netMat);
   backNet.position.set(backBarCx, GOAL_H / 2, backBarCz);
   backNet.rotation.y = Math.atan2(onz, onx); g.add(backNet);
-  // 网 - 后面半透明填充
   const backSolid = new THREE.Mesh(new THREE.PlaneGeometry(goalLen, GOAL_H), netSolidMat);
   backSolid.position.set(backBarCx, GOAL_H / 2, backBarCz);
   backSolid.rotation.y = Math.atan2(onz, onx); g.add(backSolid);
 
-  // 网 - 顶面
-  const topNet = new THREE.Mesh(new THREE.PlaneGeometry(goalLen, GOAL_D, Math.ceil(goalLen), Math.ceil(GOAL_D)), netMat);
-  topNet.rotation.x = -Math.PI / 2;
-  const topCx = barCx + onx * GOAL_D / 2, topCz = barCz + onz * GOAL_D / 2;
-  topNet.position.set(topCx, GOAL_H, topCz);
-  topNet.rotation.y = -barAngle + Math.PI / 2;
-  // 旋转顶面网使其对齐
+  // 顶网
+  const topNet = new THREE.Mesh(new THREE.PlaneGeometry(goalLen, GOAL_D, Math.ceil(goalLen * 1.5), Math.ceil(GOAL_D * 1.5)), netMat);
   topNet.rotation.set(-Math.PI / 2, -barAngle + Math.PI / 2, 0);
-  topNet.position.set(topCx, GOAL_H, topCz);
+  topNet.position.set(barCx + onx * GOAL_D / 2, GOAL_H, barCz + onz * GOAL_D / 2);
   g.add(topNet);
 
-  // 网 - 左侧面
-  const sideLenL = GOAL_D;
-  const leftNet = new THREE.Mesh(new THREE.PlaneGeometry(sideLenL, GOAL_H, Math.ceil(sideLenL), Math.ceil(GOAL_H)), netMat);
-  const lncx = (gx1 + backLeftX) / 2, lncz = (gz1 + backLeftZ) / 2;
-  leftNet.position.set(lncx, GOAL_H / 2, lncz);
+  // 左侧网
+  const leftNet = new THREE.Mesh(new THREE.PlaneGeometry(GOAL_D, GOAL_H, Math.ceil(GOAL_D * 1.5), Math.ceil(GOAL_H * 1.5)), netMat);
+  leftNet.position.set((gx1 + backLeftX) / 2, GOAL_H / 2, (gz1 + backLeftZ) / 2);
   leftNet.rotation.y = Math.atan2(onz, onx) + Math.PI / 2;
   g.add(leftNet);
 
-  // 网 - 右侧面
-  const rightNet = new THREE.Mesh(new THREE.PlaneGeometry(sideLenL, GOAL_H, Math.ceil(sideLenL), Math.ceil(GOAL_H)), netMat);
-  const rncx = (gx2 + backRightX) / 2, rncz = (gz2 + backRightZ) / 2;
-  rightNet.position.set(rncx, GOAL_H / 2, rncz);
+  // 右侧网
+  const rightNet = new THREE.Mesh(new THREE.PlaneGeometry(GOAL_D, GOAL_H, Math.ceil(GOAL_D * 1.5), Math.ceil(GOAL_H * 1.5)), netMat);
+  rightNet.position.set((gx2 + backRightX) / 2, GOAL_H / 2, (gz2 + backRightZ) / 2);
   rightNet.rotation.y = Math.atan2(onz, onx) - Math.PI / 2;
   g.add(rightNet);
 
-  // 球门区域发光标记（地面）
+  // 地面标记
   const floorMark = new THREE.Mesh(new THREE.PlaneGeometry(goalLen, GOAL_D),
     new THREE.MeshBasicMaterial({ color: teamColor, transparent: true, opacity: 0.1, side: THREE.DoubleSide }));
   floorMark.rotation.x = -Math.PI / 2;
   floorMark.rotation.z = -barAngle + Math.PI / 2;
   floorMark.position.set(barCx + onx * GOAL_D / 2, 0.02, barCz + onz * GOAL_D / 2);
   g.add(floorMark);
-
-  scene.add(g);
 }
 for (const gs of goalSegments) makePolygonGoal(gs);
 console.log(`球门数量: ${goalSegments.length}`);
@@ -439,7 +447,7 @@ console.log(`球门数量: ${goalSegments.length}`);
 // ===== 多球系统 =====
 const balls = [];
 const MAX_BALLS = 40;
-const CENTER_CIRCLE_R_REF = () => CENTER_CIRCLE_R;
+const CENTER_CIRCLE_R = 9.15;
 
 // 球皮肤类型
 const BALL_SKINS = ['football', 'basketball', 'tennis', 'volleyball', 'badminton'];
@@ -636,7 +644,7 @@ function spawnPowerup() {
   ring.rotation.x = Math.PI / 2; g.add(ring);
   // 在场地内随机位置
   let px, pz;
-  do { px = (Math.random() - 0.5) * BASE_RADIUS * 1.5; pz = (Math.random() - 0.5) * BASE_RADIUS * 1.5; } while (!isInsidePolygon(px, pz));
+  do { px = (Math.random() - 0.5) * FIELD_W * 1.8; pz = (Math.random() - 0.5) * FIELD_H * 1.8; } while (!isInsidePolygon(px, pz));
   g.position.set(px, 0.6, pz);
   scene.add(g); powerups.push({ group: g, typeKey, type, ring });
 }
@@ -809,7 +817,7 @@ function createBossMesh() {
 function spawnBoss(spawner) {
   const mesh = createBossMesh();
   let px, pz;
-  do { px = (Math.random() - 0.5) * BASE_RADIUS * 0.8; pz = (Math.random() - 0.5) * BASE_RADIUS * 0.8; } while (!isInsidePolygon(px, pz));
+  do { px = (Math.random() - 0.5) * FIELD_W * 1.5; pz = (Math.random() - 0.5) * FIELD_H * 1.5; } while (!isInsidePolygon(px, pz));
   const boss = {
     mesh, x: px, z: pz, y: 0, vx: 0, vz: 0, facing: 1,
     hp: BOSS_HP, dead: false, gunAmmo: Infinity, sniperAmmo: Infinity, grenadeAmmo: Infinity,
@@ -1334,7 +1342,215 @@ const ai2 = new PlayerState(ai2Mesh, p2StartX * 0.5, p2StartZ - 3, -1, 0xef9a9a,
 const allPlayers = [p1, p2, ai1, ai2];
 
 // ===== 游戏状态 =====
-const gameState = { score: [0, 0], kills: [0, 0], started: false, goalPause: 0, victory: false };
+const gameState = { score: [0, 0], kills: [0, 0], started: true, goalPause: 0, victory: false };
+
+// ===== 联机状态 =====
+let socket = null;
+let mpMode = 'local'; // 'local', 'host', 'client'
+let mySlot = 0; // 0=P1, 1=P2
+let roomId = '';
+let netState = { players: {} };
+let lastSent = 0;
+const netInput = { p1: {}, p2: {} };
+let localReady = false;
+// 本地测试时保持 window.location.origin；部署到 GitHub Pages 后请改为你的联机服务器地址
+const SERVER_URL = window.location.origin;
+
+function connectSocket() {
+  if (socket) return;
+  socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
+  socket.on('connect', () => {
+    document.getElementById('roomStatus').textContent = '已连接到服务器';
+  });
+  socket.on('disconnect', () => {
+    document.getElementById('roomStatus').textContent = '与服务器的连接已断开';
+  });
+  socket.on('errorMsg', (msg) => {
+    document.getElementById('roomStatus').textContent = msg;
+  });
+  socket.on('joinedRoom', ({ slot, isHost }) => {
+    mySlot = slot;
+    mpMode = isHost ? 'host' : 'client';
+    document.getElementById('roomStatus').textContent = `已${isHost ? '创建' : '加入'}房间 ${roomId}，你是 ${slot === 0 ? 'P1（蓝队）' : 'P2（红队）'}`;
+    if (isHost) {
+      document.getElementById('btnConfirm').textContent = '等待玩家加入...';
+    } else {
+      document.getElementById('btnConfirm').textContent = '准备';
+    }
+  });
+  socket.on('roomUpdate', (players) => {
+    netState.players = players;
+    const count = Object.keys(players).length;
+    if (mpMode === 'host' && count === 2) {
+      document.getElementById('roomStatus').textContent = '玩家已加入，点击开始';
+      document.getElementById('btnConfirm').textContent = '开始游戏';
+    } else if (mpMode === 'client' && !localReady) {
+      document.getElementById('roomStatus').textContent = count === 2 ? '房间已满，点击准备' : '等待另一名玩家';
+    }
+  });
+  socket.on('startGame', () => {
+    document.getElementById('multiplayerPanel').style.display = 'none';
+    initAudio(); bgMusicOn = true;
+  });
+  socket.on('gameState', (data) => {
+    if (mpMode === 'client') applyHostState(data);
+  });
+  socket.on('playerInput', ({ id, slot, input }) => {
+    if (mpMode === 'host') {
+      netInput[slot === 0 ? 'p1' : 'p2'] = input || {};
+    }
+  });
+  socket.on('goal', (data) => {
+    if (mpMode === 'client') {
+      gameState.score = data.score;
+      document.getElementById('s1').textContent = gameState.score[0];
+      document.getElementById('s2').textContent = gameState.score[1];
+    }
+  });
+}
+
+function applyHostState(data) {
+  if (!data) return;
+  // 更新玩家位置和血量
+  if (data.players) {
+    for (let i = 0; i < data.players.length && i < allPlayers.length; i++) {
+      const s = data.players[i];
+      const p = allPlayers[i];
+      if (!s || !p) continue;
+      p.x = s.x; p.y = s.y; p.z = s.z;
+      p.vx = s.vx; p.vy = s.vy; p.vz = s.vz;
+      p.mesh.group.position.set(s.x, s.y, s.z);
+      p.mesh.group.rotation.y = s.ry;
+      p.hp = s.hp;
+      p.dead = s.dead;
+    }
+  }
+  // 更新球
+  if (data.balls) {
+    while (balls.length < data.balls.length) spawnExtraBall();
+    while (balls.length > data.balls.length) {
+      const b = balls.pop(); scene.remove(b.mesh);
+    }
+    for (let i = 0; i < data.balls.length && i < balls.length; i++) {
+      const s = data.balls[i]; const b = balls[i];
+      b.mesh.position.set(s.x, s.y, s.z);
+      b.state.vx = s.vx; b.state.vy = s.vy; b.state.vz = s.vz;
+      b.state.spinX = s.sx; b.state.spinY = s.sy; b.state.spinZ = s.sz;
+    }
+  }
+  // 更新分数
+  if (data.score) {
+    gameState.score = data.score;
+    document.getElementById('s1').textContent = gameState.score[0];
+    document.getElementById('s2').textContent = gameState.score[1];
+  }
+}
+
+function serializeGameState() {
+  return {
+    players: allPlayers.map(p => ({
+      x: p.x, y: p.y, z: p.z,
+      ry: p.mesh.group.rotation.y, hp: p.hp, dead: p.dead,
+      vx: p.vx, vy: p.vy, vz: p.vz
+    })),
+    balls: balls.map(b => ({
+      x: b.mesh.position.x, y: b.mesh.position.y, z: b.mesh.position.z,
+      vx: b.state.vx, vy: b.state.vy, vz: b.state.vz,
+      sx: b.state.spinX, sy: b.state.spinY, sz: b.state.spinZ
+    })),
+    score: gameState.score
+  };
+}
+
+function collectInput(prefix) {
+  const map = prefix === 'p1' ? {
+    left: 'a', right: 'd', up: 'w', down: 's', legL: 'j', legR: 'k',
+    use: ' ', gun: 'e', sniper: 'q', grenade: 'r'
+  } : {
+    left: 'arrowleft', right: 'arrowright', up: 'arrowup', down: 'arrowdown',
+    legL: '1', legR: '2', use: '/', gun: '.', sniper: ',', grenade: '0'
+  };
+  const out = {};
+  for (const k in map) out[k] = !!keys[map[k]];
+  return out;
+}
+
+function applyRemoteInput(p, input, dt) {
+  if (!input || p.dead || p.buffs.frozen > 0) return;
+  if (p._grenadeCooldown > 0) p._grenadeCooldown -= dt;
+  // 移动
+  const speed = MOVE_SPEED * p.speedMultiplier;
+  if (input.left) p.vx -= speed * dt;
+  if (input.right) p.vx += speed * dt;
+  if (input.up) p.vz -= speed * dt;
+  if (input.down) p.vz += speed * dt;
+  // 朝向
+  if (Math.abs(p.vx) > 0.5 || Math.abs(p.vz) > 0.5) {
+    p.facing = p.vx > 0 ? 1 : -1;
+  }
+  // 腿
+  if (input.legL && p.leftTimer <= 0) { p.leftLeg = 1; p.leftTimer = 0.3; }
+  if (input.legR && p.rightTimer <= 0) { p.rightLeg = 1; p.rightTimer = 0.3; }
+  // 腿收回
+  if (p.leftTimer > 0) { p.leftTimer -= dt; if (p.leftTimer <= 0) { p.leftLeg = -1; setTimeout(() => { if (p.leftLeg === -1) p.leftLeg = 0; }, 100); } }
+  if (p.rightTimer > 0) { p.rightTimer -= dt; if (p.rightTimer <= 0) { p.rightLeg = -1; setTimeout(() => { if (p.rightLeg === -1) p.rightLeg = 0; }, 100); } }
+  // 道具拾取
+  checkPowerupPickup(p);
+  // 道具使用
+  if (input.use && p.heldPowerup) { activatePowerup(p, p.heldPowerup); p.heldPowerup = null; }
+  // 武器
+  if (input.gun && p.gunAmmo > 0) { p.gunFireTimer -= dt; if (p.gunFireTimer <= 0) { fireBullet(p); p.gunFireTimer = 0.12; } }
+  if (input.sniper && p.sniperAmmo > 0 && !p._sniperFired) { fireSniper(p); p._sniperFired = true; }
+  if (!input.sniper) p._sniperFired = false;
+  if (input.grenade) activateGrenade(p);
+}
+
+// 联机 UI 事件
+const mpPanel = document.getElementById('multiplayerPanel');
+const roomInput = document.getElementById('roomInput');
+const roomStatus = document.getElementById('roomStatus');
+let pendingAction = 'local';
+
+document.getElementById('btnLocal').onclick = () => {
+  pendingAction = 'local';
+  roomStatus.textContent = '本地模式：P1 用 WASD，P2 用方向键';
+  document.getElementById('btnConfirm').textContent = '开始游戏';
+};
+document.getElementById('btnCreate').onclick = () => {
+  pendingAction = 'create';
+  roomStatus.textContent = '输入房间号后点击确认创建';
+  document.getElementById('btnConfirm').textContent = '创建房间';
+};
+document.getElementById('btnJoin').onclick = () => {
+  pendingAction = 'join';
+  roomStatus.textContent = '输入房间号后点击确认加入';
+  document.getElementById('btnConfirm').textContent = '加入房间';
+};
+document.getElementById('btnConfirm').onclick = () => {
+  roomId = roomInput.value.trim();
+  if (!roomId) { roomStatus.textContent = '请输入房间号'; return; }
+  if (pendingAction === 'local') {
+    mpMode = 'local';
+    mpPanel.style.display = 'none';
+    initAudio(); bgMusicOn = true;
+  } else if (pendingAction === 'create') {
+    if (!socket) { connectSocket(); socket.emit('createRoom', { roomId, playerName: '房主' }); }
+    else if (mpMode === 'host' && Object.keys(netState.players).length === 2) {
+      socket.emit('startGameByHost');
+      socket.emit('startGame');
+      mpPanel.style.display = 'none';
+      initAudio(); bgMusicOn = true;
+    }
+  } else if (pendingAction === 'join') {
+    if (!socket) { connectSocket(); socket.emit('joinRoom', { roomId, playerName: '玩家' }); }
+    else if (mpMode === 'client' && !localReady) {
+      localReady = true;
+      socket.emit('ready');
+      document.getElementById('btnConfirm').textContent = '已准备';
+      roomStatus.textContent = '已准备，等待房主开始';
+    }
+  }
+};
 
 // ===== 音效 =====
 let audioCtx;
@@ -1393,10 +1609,11 @@ function updateBGMusic(dt) {
 const keys = {};
 document.addEventListener('keydown', e => {
   keys[e.key.toLowerCase()] = true;
-  if (!gameState.started) { gameState.started = true; document.getElementById('startMsg').style.display = 'none'; initAudio(); bgMusicOn = true; }
   if (e.key.toLowerCase() === 'p' && gameState.victory) restartGame();
 });
 document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+// 开始提示由联机面板替代，不自动初始化音频（需用户选择模式后触发）
+document.getElementById('startMsg').style.display = 'none';
 
 // ===== 进球检测 =====
 function goal(team, scoringBall) {
@@ -1468,7 +1685,7 @@ function restartGame() {
   for (const b of balls) resetBall(b);
   for (const f of fireworks) scene.remove(f.mesh); fireworks.length = 0;
   for (const b of bosses) scene.remove(b.mesh.group); bosses.length = 0;
-  removeFreezeEffect; removeShieldEffect;
+  for (const p of allPlayers) { removeFreezeEffect(p); removeShieldEffect(p); }
 }
 
 // ===== Buff栏UI =====
@@ -1533,22 +1750,53 @@ function animate(time) {
   const dt = Math.min((time - lastTime) / 1000, 0.05); lastTime = time;
   if (!gameState.started || gameState.victory) { renderer.render(scene, camera); return; }
   if (gameState.goalPause > 0) { gameState.goalPause -= dt; renderer.render(scene, camera); return; }
-  p1.update(dt, 'a', 'd', 'w', 's', 'j', 'k');
-  p2.update(dt, 'arrowleft', 'arrowright', 'arrowup', 'arrowdown', '1', '2');
+
+  if (mpMode === 'client') {
+    // 客机：只发送输入并应用主机状态
+    const myInput = collectInput(mySlot === 0 ? 'p1' : 'p2');
+    if (socket && socket.connected) {
+      socket.emit('playerInput', { slot: mySlot, input: myInput });
+    }
+    // 仍需要更新一些本地视觉效果
+    updateBullets(dt); updateSniperRounds(dt); updateRockets(dt); updateGrenades(dt);
+    updateZapBeams(dt); updateExplosions(dt); updateFireworks(dt); updateBosses(dt);
+    updatePowerups(dt); updateBuffs(dt);
+    updateAimLines(); updateBGMusic(dt);
+    for (const p of allPlayers) p.updateMesh();
+    updateRespawnUI(); updateBuffBar();
+    if (nukeFlash) { nukeFlash.life -= dt; if (nukeFlash.life <= 0) nukeFlash = null; }
+    renderer.render(scene, camera);
+    return;
+  }
+
+  // 本地或主机模式
+  if (mpMode === 'host') {
+    // 主机：P1本地，P2远程
+    p1.update(dt, 'a', 'd', 'w', 's', 'j', 'k');
+    applyRemoteInput(p2, netInput.p2, dt);
+  } else {
+    // 本地模式
+    p1.update(dt, 'a', 'd', 'w', 's', 'j', 'k');
+    p2.update(dt, 'arrowleft', 'arrowright', 'arrowup', 'arrowdown', '1', '2');
+  }
   ai1.update(dt); ai2.update(dt);
+
   if (!p1.dead && keys[' '] && p1.heldPowerup) { activatePowerup(p1, p1.heldPowerup); p1.heldPowerup = null; }
   if (!p1.dead && keys['e'] && p1.gunAmmo > 0) { p1.gunFireTimer -= dt; if (p1.gunFireTimer <= 0) { fireBullet(p1); p1.gunFireTimer = 0.12; } }
   if (!p1.dead && keys['q'] && p1.sniperAmmo > 0 && !p1._sniperFired) { fireSniper(p1); p1._sniperFired = true; }
   if (!keys['q']) p1._sniperFired = false;
   if (!p1.dead && keys['r']) activateGrenade(p1);
-  if (!p2.dead && keys['/'] && p2.heldPowerup) { activatePowerup(p2, p2.heldPowerup); p2.heldPowerup = null; }
-  if (!p2.dead && keys['.'] && p2.gunAmmo > 0) { p2.gunFireTimer -= dt; if (p2.gunFireTimer <= 0) { fireBullet(p2); p2.gunFireTimer = 0.12; } }
-  if (!p2.dead && keys[','] && p2.sniperAmmo > 0 && !p2._sniperFired) { fireSniper(p2); p2._sniperFired = true; }
-  if (!keys[',']) p2._sniperFired = false;
-  if (!p2.dead && keys['0']) activateGrenade(p2);
+
+  if (mpMode === 'local') {
+    if (!p2.dead && keys['/'] && p2.heldPowerup) { activatePowerup(p2, p2.heldPowerup); p2.heldPowerup = null; }
+    if (!p2.dead && keys['.'] && p2.gunAmmo > 0) { p2.gunFireTimer -= dt; if (p2.gunFireTimer <= 0) { fireBullet(p2); p2.gunFireTimer = 0.12; } }
+    if (!p2.dead && keys[','] && p2.sniperAmmo > 0 && !p2._sniperFired) { fireSniper(p2); p2._sniperFired = true; }
+    if (!keys[',']) p2._sniperFired = false;
+    if (!p2.dead && keys['0']) activateGrenade(p2);
+  }
+
   for (let i = balls.length - 1; i >= 0; i--) {
     const ball = balls[i];
-    // 多球不消失，无timer
     updateBallPhysics(ball, dt);
     for (const p of allPlayers) { if (!p.dead) { p.pushBall(ball.state, ball); p.kickBall(ball.state, ball); } }
   }
@@ -1560,9 +1808,29 @@ function animate(time) {
   for (const p of allPlayers) p.updateMesh();
   updateRespawnUI(); updateBuffBar();
   if (nukeFlash) { nukeFlash.life -= dt; if (nukeFlash.life <= 0) nukeFlash = null; }
+
+  // 主机广播状态
+  if (mpMode === 'host' && socket && socket.connected) {
+    const now = performance.now();
+    if (now - lastSent > 50) { // 20fps
+      socket.emit('gameState', serializeGameState());
+      lastSent = now;
+    }
+  }
+
   renderer.render(scene, camera);
 }
 requestAnimationFrame(animate);
+
+// 调试/测试暴露
+window.gameDebug = {
+  get mpMode() { return mpMode; },
+  get mySlot() { return mySlot; },
+  get gameState() { return gameState; },
+  get allPlayers() { return allPlayers; },
+  get socket() { return socket; },
+  get balls() { return balls; }
+};
 </script>
 </body>
 </html>
