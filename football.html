@@ -1354,7 +1354,7 @@ let lastSent = 0;
 const netInput = { p1: {}, p2: {} };
 let localReady = false;
 // 本地测试时保持 window.location.origin；部署到 GitHub Pages 后请改为你的联机服务器地址
-const SERVER_URL = window.location.origin;
+const SERVER_URL = 'https://flatfootball3d-server.onrender.com'; = window.location.origin;
 
 function connectSocket() {
   if (socket) return;
