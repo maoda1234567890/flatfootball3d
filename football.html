@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
@@ -100,6 +100,35 @@
   #multiplayerPanel button:hover { background: #29b6f6; }
   #multiplayerPanel #roomStatus { color: #aaa; font-size: 14px; min-height: 20px; }
   #multiplayerPanel .mode-btns { display: flex; gap: 12px; }
+  #chatPanel { position: fixed; bottom: 50px; left: 12px; width: 320px; max-height: 300px; background: rgba(0,0,0,0.78); border-radius: 10px; z-index: 15; display: flex; flex-direction: column; backdrop-filter: blur(6px); color: #fff; font-size: 13px; border: 1px solid rgba(255,255,255,0.12); }
+  #chatHeader { display: flex; justify-content: space-between; align-items: center; padding: 7px 10px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: bold; font-size: 13px; }
+  #chatTabs { display: flex; gap: 4px; padding: 4px 6px; }
+  .chat-tab { padding: 3px 9px; border-radius: 4px; cursor: pointer; font-size: 11px; background: rgba(255,255,255,0.08); }
+  .chat-tab.active { background: #4fc3f7; color: #000; }
+  #chatMessages { flex: 1; overflow-y: auto; padding: 5px 10px; max-height: 180px; min-height: 100px; font-size: 12px; line-height: 1.5; }
+  #chatMessages::-webkit-scrollbar { width: 4px; }
+  #chatMessages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+  .chat-msg { margin-bottom: 2px; word-break: break-word; }
+  .chat-msg .name { color: #4fc3f7; font-weight: bold; }
+  .chat-msg .pm-name { color: #ffd54f; font-weight: bold; }
+  .chat-msg .time { color: rgba(255,255,255,0.35); font-size: 10px; margin-left: 4px; }
+  #chatInputBox { display: flex; padding: 5px 6px; gap: 4px; border-top: 1px solid rgba(255,255,255,0.1); }
+  #chatInput { flex: 1; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 4px 8px; color: #fff; font-size: 12px; outline: none; }
+  #chatSend { padding: 4px 10px; border-radius: 4px; border: none; background: #4fc3f7; color: #000; cursor: pointer; font-weight: bold; font-size: 12px; }
+  #chatSend:hover { background: #29b6f6; }
+  #chatPanel.collapsed #chatTabs, #chatPanel.collapsed #chatMessages, #chatPanel.collapsed #chatInputBox { display: none; }
+  #chatAuthModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 60; display: none; align-items: center; justify-content: center; }
+  #chatAuthModal.show { display: flex; }
+  #chatAuthBox { background: #222; padding: 22px; border-radius: 12px; width: 290px; color: #fff; display: flex; flex-direction: column; gap: 9px; }
+  #chatAuthBox h3 { text-align: center; margin-bottom: 4px; }
+  #chatAuthBox input { padding: 8px 12px; border-radius: 6px; border: 1px solid #444; background: #111; color: #fff; font-size: 14px; }
+  #chatAuthBox button { padding: 9px; border-radius: 6px; border: none; background: #4fc3f7; color: #000; cursor: pointer; font-weight: bold; font-size: 14px; }
+  #chatAuthBox .toggle-link { text-align: center; color: #4fc3f7; cursor: pointer; font-size: 12px; }
+  #chatAuthMsg { color: #ef5350; font-size: 12px; text-align: center; min-height: 14px; }
+  .online-user-item, .friend-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; cursor: pointer; border-radius: 4px; font-size: 12px; }
+  .online-user-item:hover, .friend-item:hover { background: rgba(255,255,255,0.1); }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .status-online { background: #4caf50; } .status-offline { background: #666; }
 </style>
 </head>
 <body>
@@ -121,6 +150,41 @@
   <div class="ctrl"><b style="color:#4fc3f7">P1</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>爬行 <kbd>J</kbd>左腿 <kbd>K</kbd>右腿 <kbd>Space</kbd>使用道具 <kbd>E</kbd>冲锋枪 <kbd>Q</kbd>狙击枪 <kbd>R</kbd>手雷</div>
   <div class="ctrl"><b style="color:#ef5350">P2</b> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>爬行 <kbd>1</kbd>左腿 <kbd>2</kbd>右腿 <kbd>/</kbd>使用道具 <kbd>.</kbd>冲锋枪 <kbd>,</kbd>狙击枪 <kbd>0</kbd>手雷</div>
 </div>
+<div id="viewCount"><span class="eye">👁️</span>浏览 <span class="num" id="viewNum">1</span></div>
+<div id="chatPanel" class="collapsed">
+  <div id="chatHeader"><span>💬 聊天 <span id="chatUnread" style="color:#ffd54f"></span></span><span id="chatToggle">▲</span></div>
+  <div id="chatTabs">
+    <div class="chat-tab active" data-tab="world">世界</div>
+    <div class="chat-tab" data-tab="private">私聊</div>
+    <div class="chat-tab" data-tab="friends">好友</div>
+    <div class="chat-tab" data-tab="online">在线</div>
+  </div>
+  <div id="chatMessages"></div>
+  <div id="chatInputBox">
+    <input id="chatInput" type="text" placeholder="按 Enter 聊天..." maxlength="200" />
+    <button id="chatSend">发送</button>
+  </div>
+</div>
+<div id="chatAuthModal">
+  <div id="chatAuthBox">
+    <h3 id="authTitle">登录聊天</h3>
+    <input id="authUsername" type="text" placeholder="用户名" />
+    <input id="authPassword" type="password" placeholder="密码" />
+    <input id="authNickname" type="text" placeholder="昵称（注册时填写）" style="display:none" />
+    <button id="authSubmit">登录</button>
+    <div id="chatAuthMsg"></div>
+    <div class="toggle-link" id="authToggle">没有账号？去注册</div>
+  </div>
+</div>
+<div id="viewCount"><span class="eye">👁️</span>浏览 <span class="num" id="viewNum">1</span></div>
+
+    <div class="toggle-link" id="authToggle">没有账号？去注册</div>
+  </div>
+</div>
+
+    <div class="toggle-link" id="authToggle">没有账号？去注册</div>
+  </div>
+</div>
 <div id="multiplayerPanel">
   <h2>躺平足球3D 联机版</h2>
   <div class="mode-btns">
@@ -138,6 +202,9 @@
 </script>
 <script type="module">
 import * as THREE from 'three';
+
+// ===== 浏览次数 =====
+(function() { try { let n = parseInt(localStorage.getItem('flatfootball3d_views') || '0', 10); if (isNaN(n)) n = 0; n += 1; localStorage.setItem('flatfootball3d_views', String(n)); const el = document.getElementById('viewNum'); if (el) el.textContent = n.toLocaleString(); } catch(e) {} })();
 
 // ===== 常量 =====
 const BALL_R = 0.4;
@@ -440,6 +507,7 @@ function makePolygonGoal(gs) {
   floorMark.rotation.z = -barAngle + Math.PI / 2;
   floorMark.position.set(barCx + onx * GOAL_D / 2, 0.02, barCz + onz * GOAL_D / 2);
   g.add(floorMark);
+  scene.add(g);
 }
 for (const gs of goalSegments) makePolygonGoal(gs);
 console.log(`球门数量: ${goalSegments.length}`);
@@ -1355,6 +1423,10 @@ const netInput = { p1: {}, p2: {} };
 let localReady = false;
 // 本地测试时保持 window.location.origin；部署到 GitHub Pages 后请改为你的联机服务器地址
 const SERVER_URL = 'https://flatfootball3d-server.onrender.com';
+const CHAT_URL = 'https://football-chat-server.onrender.com';
+let chatSocket = null;
+let chatUser = null;
+let chatInputActive = false;
 
 function connectSocket() {
   if (socket) return;
@@ -1608,10 +1680,16 @@ function updateBGMusic(dt) {
 // ===== 输入 =====
 const keys = {};
 document.addEventListener('keydown', e => {
+  if (chatInputActive) {
+    if (e.key === 'Enter') { e.preventDefault(); sendChatMessage(); }
+    else if (e.key === 'Escape') { e.preventDefault(); blurChatInput(); }
+    return;
+  }
+  if (e.key === 'Enter' && chatUser) { e.preventDefault(); focusChatInput(); return; }
   keys[e.key.toLowerCase()] = true;
   if (e.key.toLowerCase() === 'p' && gameState.victory) restartGame();
 });
-document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+document.addEventListener('keyup', e => { if (!chatInputActive) keys[e.key.toLowerCase()] = false; });
 // 开始提示由联机面板替代，不自动初始化音频（需用户选择模式后触发）
 document.getElementById('startMsg').style.display = 'none';
 
@@ -1820,6 +1898,26 @@ function animate(time) {
 
   renderer.render(scene, camera);
 }
+// ===== 聊天系统 =====
+let chatTab='world'; let onlineUsersList=[]; let friendsList=[]; let privateChatTarget=null; let unreadCount=0; let authMode='login';
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&gt;','>':'&gt;','"':'&quot;',"":'&#39;'})[c]));}
+function updateUnread(){const el=document.getElementById('chatUnread');if(el)el.textContent=unreadCount>0?(+unreadCount+):';}
+function addSystemMsg(text){const box=document.getElementById('chatMessages');if(!box)return;const div=document.createElement('div');div.className='chat-msg';div.style.color='#ffd54f';div.style.fontStyle='italic';div.textContent=text;box.appendChild(div);box.scrollTop=box.scrollHeight;}
+function addChatMsg(type,data){const box=document.getElementById('chatMessages');if(!box)return;const div=document.createElement('div');div.className='chat-msg';const time=new Date(data.timestamp).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});const isPM=type==='private';const nameClass=isPM?'pm-name':'name';div.innerHTML='<span class="'+nameClass+'">'+escapeHtml(data.senderName)+':</span> '+escapeHtml(data.content)+'<span class="time">'+time+'</span>';box.appendChild(div);box.scrollTop=box.scrollHeight;}
+function renderOnlineUsers(){const box=document.getElementById('chatMessages');if(!box)return;box.innerHTML='';const others=onlineUsersList.filter(u=>!chatUser||u.userId!==chatUser.userId);if(others.length===0){addSystemMsg('暂无其他在线用户');return;}others.forEach(u=>{const div=document.createElement('div');div.className='online-user-item';div.innerHTML='<span><span class="status-dot status-online"></span>'+escapeHtml(u.nickname)+'</span><span style="color:#4fc3f7;font-size:11px">私聊</span>';div.onclick=()=>{privateChatTarget=u;switchChatTab('private');const inp=document.getElementById('chatInput');if(inp)inp.placeholder='私聊 '+u.nickname+'...';};box.appendChild(div);});}
+function renderFriendsList(){const box=document.getElementById('chatMessages');if(!box)return;box.innerHTML='';if(friendsList.length===0){addSystemMsg('暂无好友，去在线列表添加吧！');return;}friendsList.forEach(f=>{const div=document.createElement('div');div.className='friend-item';div.innerHTML='<span><span class="status-dot '+(f.online?'status-online':'status-offline')+'"></span>'+escapeHtml(f.nickname)+'</span><span style="color:#4fc3f7;font-size:11px">'+(f.online?'私聊':'离线')+'</span>';if(f.online)div.onclick=()=>{privateChatTarget=f;switchChatTab('private');const inp=document.getElementById('chatInput');if(inp)inp.placeholder='私聊 '+f.nickname+'...';};box.appendChild(div);});}
+function switchChatTab(tab){chatTab=tab;document.querySelectorAll('.chat-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));const box=document.getElementById('chatMessages');if(!box)return;box.innerHTML='';if(tab==='online')renderOnlineUsers();else if(tab==='friends')renderFriendsList();else if(tab==='private')addSystemMsg(privateChatTarget?('正在和 '+privateChatTarget.nickname+' 私聊'):'点击在线用户或好友开始私聊');unreadCount=0;updateUnread();}
+function sendChatMessage(){const input=document.getElementById('chatInput');if(!input)return;const content=input.value.trim();if(!content||!chatSocket||!chatUser){blurChatInput();return;}if(chatTab==='private'&&privateChatTarget){chatSocket.emit('send_private_message',{receiverId:privateChatTarget.userId,content});}else{chatSocket.emit('send_world_message',{content});}input.value='';input.focus();}
+function focusChatInput(){const el=document.getElementById('chatInput');if(!el)return;el.focus();chatInputActive=true;for(const k in keys)keys[k]=false;}
+function blurChatInput(){const el=document.getElementById('chatInput');if(el)el.blur();chatInputActive=false;}
+function connectChat(){if(chatSocket)return;chatSocket=io(CHAT_URL,{transports:['websocket','polling']});chatSocket.on('auth_success',(data)=>{chatUser=data;const m=document.getElementById('chatAuthModal');if(m)m.classList.remove('show');const h=document.getElementById('chatHeader');if(h)h.firstElementChild.innerHTML='💬 '+escapeHtml(data.nickname)+' <span id="chatUnread" style="color:#ffd54f"></span>';addSystemMsg('欢迎，'+data.nickname+'！');chatSocket.emit('get_friends_list');});chatSocket.on('auth_error',({message})=>{const e=document.getElementById('chatAuthMsg');if(e)e.textContent=message;});chatSocket.on('receive_world_message',(data)=>{const p=document.getElementById('chatPanel');if(chatTab!=='world'||(p&&p.classList.contains('collapsed'))){unreadCount++;updateUnread();}if(chatTab==='world')addChatMsg('world',data);});chatSocket.on('receive_private_message',(data)=>{if(chatTab!=='private'){unreadCount++;updateUnread();}if(chatTab==='private')addChatMsg('private',data);});chatSocket.on('online_users',(users)=>{onlineUsersList=users;if(chatTab==='online')renderOnlineUsers();else if(chatTab==='friends')renderFriendsList();});chatSocket.on('friends_list',(friends)=>{friendsList=friends;if(chatTab==='friends')renderFriendsList();});}
+function showAuthModal(){if(!chatSocket)connectChat();const el=document.getElementById('chatAuthModal');if(el)el.classList.add('show');}
+document.getElementById('chatHeader').addEventListener('click',()=>{const p=document.getElementById('chatPanel');if(!p)return;p.classList.toggle('collapsed');const t=document.getElementById('chatToggle');if(t)t.textContent=p.classList.contains('collapsed')?'▲':'▼';if(!p.classList.contains('collapsed')){unreadCount=0;updateUnread();}if(!chatUser)showAuthModal();});
+document.querySelectorAll('.chat-tab').forEach(t=>{t.addEventListener('click',(e)=>{e.stopPropagation();if(chatUser)switchChatTab(t.dataset.tab);});});
+const ci=document.getElementById('chatInput');if(ci){ci.addEventListener('focus',focusChatInput);ci.addEventListener('blur',()=>{chatInputActive=false;});}
+const cs=document.getElementById('chatSend');if(cs)cs.addEventListener('click',(e)=>{e.stopPropagation();sendChatMessage();});
+const at=document.getElementById('authToggle');if(at)at.addEventListener('click',()=>{authMode=authMode==='login'?'register':'login';document.getElementById('authTitle').textContent=authMode==='login'?'登录聊天':'注册聊天';const n=document.getElementById('authNickname');if(n)n.style.display=authMode==='register'?'block':'none';document.getElementById('authSubmit').textContent=authMode==='login'?'登录':'注册';at.textContent=authMode==='login'?'没有账号？去注册':'已有账号？去登录';document.getElementById('chatAuthMsg').textContent='';});
+const as=document.getElementById('authSubmit');if(as)as.addEventListener('click',()=>{const u=document.getElementById('authUsername').value.trim();const p=document.getElementById('authPassword').value;if(!u||!p){document.getElementById('chatAuthMsg').textContent='请填写用户名和密码';return;}if(authMode==='register'){const n=document.getElementById('authNickname').value.trim();if(!n){document.getElementById('chatAuthMsg').textContent='请填写昵称';return;}chatSocket.emit('register',{username:u,password:p,nickname:n});}else{chatSocket.emit('login',{username:u,password:p});}});}
 requestAnimationFrame(animate);
 
 // 调试/测试暴露
