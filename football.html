@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
@@ -100,35 +100,198 @@
   #multiplayerPanel button:hover { background: #29b6f6; }
   #multiplayerPanel #roomStatus { color: #aaa; font-size: 14px; min-height: 20px; }
   #multiplayerPanel .mode-btns { display: flex; gap: 12px; }
-  #chatPanel { position: fixed; bottom: 50px; left: 12px; width: 320px; max-height: 300px; background: rgba(0,0,0,0.78); border-radius: 10px; z-index: 15; display: flex; flex-direction: column; backdrop-filter: blur(6px); color: #fff; font-size: 13px; border: 1px solid rgba(255,255,255,0.12); }
-  #chatHeader { display: flex; justify-content: space-between; align-items: center; padding: 7px 10px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: bold; font-size: 13px; }
-  #chatTabs { display: flex; gap: 4px; padding: 4px 6px; }
-  .chat-tab { padding: 3px 9px; border-radius: 4px; cursor: pointer; font-size: 11px; background: rgba(255,255,255,0.08); }
-  .chat-tab.active { background: #4fc3f7; color: #000; }
-  #chatMessages { flex: 1; overflow-y: auto; padding: 5px 10px; max-height: 180px; min-height: 100px; font-size: 12px; line-height: 1.5; }
-  #chatMessages::-webkit-scrollbar { width: 4px; }
-  #chatMessages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
-  .chat-msg { margin-bottom: 2px; word-break: break-word; }
-  .chat-msg .name { color: #4fc3f7; font-weight: bold; }
-  .chat-msg .pm-name { color: #ffd54f; font-weight: bold; }
-  .chat-msg .time { color: rgba(255,255,255,0.35); font-size: 10px; margin-left: 4px; }
-  #chatInputBox { display: flex; padding: 5px 6px; gap: 4px; border-top: 1px solid rgba(255,255,255,0.1); }
-  #chatInput { flex: 1; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 4px 8px; color: #fff; font-size: 12px; outline: none; }
-  #chatSend { padding: 4px 10px; border-radius: 4px; border: none; background: #4fc3f7; color: #000; cursor: pointer; font-weight: bold; font-size: 12px; }
-  #chatSend:hover { background: #29b6f6; }
-  #chatPanel.collapsed #chatTabs, #chatPanel.collapsed #chatMessages, #chatPanel.collapsed #chatInputBox { display: none; }
-  #chatAuthModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 60; display: none; align-items: center; justify-content: center; }
-  #chatAuthModal.show { display: flex; }
-  #chatAuthBox { background: #222; padding: 22px; border-radius: 12px; width: 290px; color: #fff; display: flex; flex-direction: column; gap: 9px; }
-  #chatAuthBox h3 { text-align: center; margin-bottom: 4px; }
-  #chatAuthBox input { padding: 8px 12px; border-radius: 6px; border: 1px solid #444; background: #111; color: #fff; font-size: 14px; }
-  #chatAuthBox button { padding: 9px; border-radius: 6px; border: none; background: #4fc3f7; color: #000; cursor: pointer; font-weight: bold; font-size: 14px; }
-  #chatAuthBox .toggle-link { text-align: center; color: #4fc3f7; cursor: pointer; font-size: 12px; }
-  #chatAuthMsg { color: #ef5350; font-size: 12px; text-align: center; min-height: 14px; }
-  .online-user-item, .friend-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; cursor: pointer; border-radius: 4px; font-size: 12px; }
-  .online-user-item:hover, .friend-item:hover { background: rgba(255,255,255,0.1); }
-  .status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-  .status-online { background: #4caf50; } .status-offline { background: #666; }
+
+/* ===== 聊天 & 好友系统样式 ===== */
+#loginOverlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.92); z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+}
+#loginOverlay.hidden { display: none; }
+.login-box {
+  background: rgba(20,20,30,0.95); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px; padding: 36px 40px; width: 400px; max-width: 92vw;
+  backdrop-filter: blur(12px); box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+}
+.login-box h2 { color: #fff; text-align: center; margin-bottom: 24px; font-size: 22px; }
+.login-box .tab-bar { display: flex; gap: 0; margin-bottom: 20px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.15); }
+.login-box .tab-bar button {
+  flex: 1; padding: 10px; border: none; cursor: pointer; font-size: 14px; font-weight: 600;
+  background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.5); transition: all 0.2s;
+}
+.login-box .tab-bar button.active { background: #4fc3f7; color: #000; }
+.login-box .form-group { margin-bottom: 14px; }
+.login-box .form-group label { display: block; color: rgba(255,255,255,0.6); font-size: 12px; margin-bottom: 4px; }
+.login-box .form-group input {
+  width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06); color: #fff; font-size: 14px; outline: none; transition: border 0.2s;
+}
+.login-box .form-group input:focus { border-color: #4fc3f7; }
+.login-box .submit-btn {
+  width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer;
+  background: linear-gradient(135deg, #4fc3f7, #29b6f6); color: #000; font-size: 15px;
+  font-weight: 700; margin-top: 8px; transition: opacity 0.2s;
+}
+.login-box .submit-btn:hover { opacity: 0.85; }
+.login-box .skip-btn {
+  width: 100%; padding: 10px; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+  cursor: pointer; background: transparent; color: rgba(255,255,255,0.5); font-size: 13px;
+  margin-top: 10px; transition: all 0.2s;
+}
+.login-box .skip-btn:hover { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.8); }
+.login-error { color: #ef5350; font-size: 12px; text-align: center; min-height: 18px; margin-top: 8px; }
+.login-status { color: #aaa; font-size: 12px; text-align: center; margin-top: 6px; }
+
+/* 聊天窗口 */
+#chatPanel {
+  position: fixed; bottom: 12px; right: 12px; width: 320px; z-index: 60;
+  display: flex; flex-direction: column; font-size: 13px;
+}
+#chatPanel.collapsed #chatBody { display: none; }
+#chatToggle {
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+  padding: 8px 14px; border-radius: 10px 10px 0 0; cursor: pointer;
+  color: #fff; font-weight: 600; font-size: 13px; user-select: none;
+  border: 1px solid rgba(255,255,255,0.08); border-bottom: none;
+}
+#chatToggle .badge { background: #ef5350; color: #fff; border-radius: 10px; padding: 1px 7px; font-size: 11px; margin-left: 6px; display: none; }
+#chatBody {
+  background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.08); border-top: none;
+  border-radius: 0 0 10px 10px; display: flex; flex-direction: column; height: 400px;
+}
+.chat-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.chat-tabs button {
+  flex: 1; padding: 8px; border: none; cursor: pointer; font-size: 12px; font-weight: 600;
+  background: transparent; color: rgba(255,255,255,0.4); transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+}
+.chat-tabs button.active { color: #4fc3f7; border-bottom-color: #4fc3f7; }
+#chatPrivateBar {
+  display: none; padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.03);
+}
+#chatPrivateBar select {
+  width: 100%; padding: 5px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(0,0,0,0.5); color: #fff; font-size: 12px; outline: none;
+}
+#chatMessages {
+  flex: 1; overflow-y: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 4px;
+}
+#chatMessages::-webkit-scrollbar { width: 4px; }
+#chatMessages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+.chat-msg { color: rgba(255,255,255,0.85); line-height: 1.4; word-break: break-all; }
+.chat-msg .sender { font-weight: 600; }
+.chat-msg .sender.self { color: #4fc3f7; }
+.chat-msg .sender.other { color: #ffd54f; }
+.chat-msg .time { color: rgba(255,255,255,0.3); font-size: 10px; margin-left: 6px; }
+.chat-msg.system { color: rgba(255,255,255,0.4); font-style: italic; font-size: 12px; }
+#chatInputArea {
+  display: flex; gap: 6px; padding: 8px 10px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+#chatInput {
+  flex: 1; padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06); color: #fff; font-size: 13px; outline: none;
+}
+#chatInput:focus { border-color: #4fc3f7; }
+#chatSendBtn {
+  padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer;
+  background: #4fc3f7; color: #000; font-weight: 600; font-size: 12px; white-space: nowrap;
+}
+#chatSendBtn:hover { background: #29b6f6; }
+
+/* 好友窗口 */
+#friendPanel {
+  position: fixed; bottom: 12px; left: 12px; width: 280px; z-index: 60;
+  display: flex; flex-direction: column; font-size: 13px;
+}
+#friendPanel.collapsed #friendBody { display: none; }
+#friendPanel.collapsed #friendToggle { border-radius: 10px; }
+#friendToggle {
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+  padding: 8px 14px; border-radius: 10px 10px 0 0; cursor: pointer;
+  color: #fff; font-weight: 600; font-size: 13px; user-select: none;
+  border: 1px solid rgba(255,255,255,0.08); border-bottom: none;
+}
+#friendToggle .badge { background: #ffd54f; color: #000; border-radius: 10px; padding: 1px 7px; font-size: 11px; margin-left: 6px; display: none; }
+#friendBody {
+  background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.08); border-top: none;
+  border-radius: 0 0 10px 10px; display: flex; flex-direction: column; height: 400px;
+}
+.friend-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.friend-tabs button {
+  flex: 1; padding: 8px; border: none; cursor: pointer; font-size: 12px; font-weight: 600;
+  background: transparent; color: rgba(255,255,255,0.4); transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+}
+.friend-tabs button.active { color: #ffd54f; border-bottom-color: #ffd54f; }
+#friendSearchArea { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+#friendSearchInput {
+  width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06); color: #fff; font-size: 12px; outline: none;
+}
+#friendSearchInput:focus { border-color: #ffd54f; }
+#friendList {
+  flex: 1; overflow-y: auto; padding: 6px 0;
+}
+#friendList::-webkit-scrollbar { width: 4px; }
+#friendList::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+.friend-item {
+  display: flex; align-items: center; padding: 8px 12px; gap: 8px;
+  transition: background 0.15s; cursor: default;
+}
+.friend-item:hover { background: rgba(255,255,255,0.04); }
+.friend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.friend-dot.online { background: #66bb6a; box-shadow: 0 0 4px #66bb6a; }
+.friend-dot.offline { background: #666; }
+.friend-nick { flex: 1; color: rgba(255,255,255,0.85); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.friend-actions { display: flex; gap: 4px; }
+.friend-actions button {
+  padding: 3px 8px; border: none; border-radius: 4px; cursor: pointer;
+  font-size: 11px; font-weight: 600; transition: opacity 0.2s;
+}
+.friend-actions button:hover { opacity: 0.8; }
+.btn-msg { background: #4fc3f7; color: #000; }
+.btn-accept { background: #66bb6a; color: #000; }
+.btn-reject { background: #ef5350; color: #fff; }
+.btn-remove { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); }
+.btn-add { background: #ffd54f; color: #000; }
+.search-result { padding: 8px 12px; display: flex; align-items: center; gap: 8px; }
+.search-result .nick { flex: 1; color: #fff; font-size: 13px; }
+
+/* 好友申请通知 */
+#friendNotifPopup {
+  position: fixed; top: 20px; right: 20px; z-index: 300;
+  display: none; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto;
+}
+#friendNotifPopup.show { display: flex; }
+.friend-notif-card {
+  background: rgba(20,20,30,0.95); border: 1px solid rgba(255,213,79,0.3);
+  border-radius: 10px; padding: 12px 16px; width: 260px;
+  backdrop-filter: blur(8px); animation: slideIn 0.3s ease-out;
+}
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.friend-notif-card .notif-title { color: #ffd54f; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.friend-notif-card .notif-nick { color: #fff; font-size: 14px; font-weight: 700; }
+.friend-notif-card .notif-msg { color: rgba(255,255,255,0.5); font-size: 12px; margin: 4px 0 8px; }
+.friend-notif-card .notif-btns { display: flex; gap: 8px; }
+.friend-notif-card .notif-btns button {
+  flex: 1; padding: 6px; border: none; border-radius: 6px; cursor: pointer;
+  font-size: 12px; font-weight: 600;
+}
+
+/* 连接状态指示 */
+#connStatus {
+  position: fixed; top: 12px; right: 12px; z-index: 55;
+  padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+  background: rgba(0,0,0,0.6); color: #666; display: none;
+}
+#connStatus.connected { color: #66bb6a; display: block; }
+#connStatus.disconnected { color: #ef5350; display: block; }
 </style>
 </head>
 <body>
@@ -150,41 +313,6 @@
   <div class="ctrl"><b style="color:#4fc3f7">P1</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>爬行 <kbd>J</kbd>左腿 <kbd>K</kbd>右腿 <kbd>Space</kbd>使用道具 <kbd>E</kbd>冲锋枪 <kbd>Q</kbd>狙击枪 <kbd>R</kbd>手雷</div>
   <div class="ctrl"><b style="color:#ef5350">P2</b> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>爬行 <kbd>1</kbd>左腿 <kbd>2</kbd>右腿 <kbd>/</kbd>使用道具 <kbd>.</kbd>冲锋枪 <kbd>,</kbd>狙击枪 <kbd>0</kbd>手雷</div>
 </div>
-<div id="viewCount"><span class="eye">👁️</span>浏览 <span class="num" id="viewNum">1</span></div>
-<div id="chatPanel" class="collapsed">
-  <div id="chatHeader"><span>💬 聊天 <span id="chatUnread" style="color:#ffd54f"></span></span><span id="chatToggle">▲</span></div>
-  <div id="chatTabs">
-    <div class="chat-tab active" data-tab="world">世界</div>
-    <div class="chat-tab" data-tab="private">私聊</div>
-    <div class="chat-tab" data-tab="friends">好友</div>
-    <div class="chat-tab" data-tab="online">在线</div>
-  </div>
-  <div id="chatMessages"></div>
-  <div id="chatInputBox">
-    <input id="chatInput" type="text" placeholder="按 Enter 聊天..." maxlength="200" />
-    <button id="chatSend">发送</button>
-  </div>
-</div>
-<div id="chatAuthModal">
-  <div id="chatAuthBox">
-    <h3 id="authTitle">登录聊天</h3>
-    <input id="authUsername" type="text" placeholder="用户名" />
-    <input id="authPassword" type="password" placeholder="密码" />
-    <input id="authNickname" type="text" placeholder="昵称（注册时填写）" style="display:none" />
-    <button id="authSubmit">登录</button>
-    <div id="chatAuthMsg"></div>
-    <div class="toggle-link" id="authToggle">没有账号？去注册</div>
-  </div>
-</div>
-<div id="viewCount"><span class="eye">👁️</span>浏览 <span class="num" id="viewNum">1</span></div>
-
-    <div class="toggle-link" id="authToggle">没有账号？去注册</div>
-  </div>
-</div>
-
-    <div class="toggle-link" id="authToggle">没有账号？去注册</div>
-  </div>
-</div>
 <div id="multiplayerPanel">
   <h2>躺平足球3D 联机版</h2>
   <div class="mode-btns">
@@ -202,9 +330,6 @@
 </script>
 <script type="module">
 import * as THREE from 'three';
-
-// ===== 浏览次数 =====
-(function() { try { let n = parseInt(localStorage.getItem('flatfootball3d_views') || '0', 10); if (isNaN(n)) n = 0; n += 1; localStorage.setItem('flatfootball3d_views', String(n)); const el = document.getElementById('viewNum'); if (el) el.textContent = n.toLocaleString(); } catch(e) {} })();
 
 // ===== 常量 =====
 const BALL_R = 0.4;
@@ -507,7 +632,6 @@ function makePolygonGoal(gs) {
   floorMark.rotation.z = -barAngle + Math.PI / 2;
   floorMark.position.set(barCx + onx * GOAL_D / 2, 0.02, barCz + onz * GOAL_D / 2);
   g.add(floorMark);
-  scene.add(g);
 }
 for (const gs of goalSegments) makePolygonGoal(gs);
 console.log(`球门数量: ${goalSegments.length}`);
@@ -1423,10 +1547,6 @@ const netInput = { p1: {}, p2: {} };
 let localReady = false;
 // 本地测试时保持 window.location.origin；部署到 GitHub Pages 后请改为你的联机服务器地址
 const SERVER_URL = 'https://flatfootball3d-server.onrender.com';
-const CHAT_URL = 'https://football-chat-server.onrender.com';
-let chatSocket = null;
-let chatUser = null;
-let chatInputActive = false;
 
 function connectSocket() {
   if (socket) return;
@@ -1680,16 +1800,10 @@ function updateBGMusic(dt) {
 // ===== 输入 =====
 const keys = {};
 document.addEventListener('keydown', e => {
-  if (chatInputActive) {
-    if (e.key === 'Enter') { e.preventDefault(); sendChatMessage(); }
-    else if (e.key === 'Escape') { e.preventDefault(); blurChatInput(); }
-    return;
-  }
-  if (e.key === 'Enter' && chatUser) { e.preventDefault(); focusChatInput(); return; }
   keys[e.key.toLowerCase()] = true;
   if (e.key.toLowerCase() === 'p' && gameState.victory) restartGame();
 });
-document.addEventListener('keyup', e => { if (!chatInputActive) keys[e.key.toLowerCase()] = false; });
+document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 // 开始提示由联机面板替代，不自动初始化音频（需用户选择模式后触发）
 document.getElementById('startMsg').style.display = 'none';
 
@@ -1898,26 +2012,6 @@ function animate(time) {
 
   renderer.render(scene, camera);
 }
-// ===== 聊天系统 =====
-let chatTab='world'; let onlineUsersList=[]; let friendsList=[]; let privateChatTarget=null; let unreadCount=0; let authMode='login';
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&gt;','>':'&gt;','"':'&quot;',"":'&#39;'})[c]));}
-function updateUnread(){const el=document.getElementById('chatUnread');if(el)el.textContent=unreadCount>0?(+unreadCount+):';}
-function addSystemMsg(text){const box=document.getElementById('chatMessages');if(!box)return;const div=document.createElement('div');div.className='chat-msg';div.style.color='#ffd54f';div.style.fontStyle='italic';div.textContent=text;box.appendChild(div);box.scrollTop=box.scrollHeight;}
-function addChatMsg(type,data){const box=document.getElementById('chatMessages');if(!box)return;const div=document.createElement('div');div.className='chat-msg';const time=new Date(data.timestamp).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});const isPM=type==='private';const nameClass=isPM?'pm-name':'name';div.innerHTML='<span class="'+nameClass+'">'+escapeHtml(data.senderName)+':</span> '+escapeHtml(data.content)+'<span class="time">'+time+'</span>';box.appendChild(div);box.scrollTop=box.scrollHeight;}
-function renderOnlineUsers(){const box=document.getElementById('chatMessages');if(!box)return;box.innerHTML='';const others=onlineUsersList.filter(u=>!chatUser||u.userId!==chatUser.userId);if(others.length===0){addSystemMsg('暂无其他在线用户');return;}others.forEach(u=>{const div=document.createElement('div');div.className='online-user-item';div.innerHTML='<span><span class="status-dot status-online"></span>'+escapeHtml(u.nickname)+'</span><span style="color:#4fc3f7;font-size:11px">私聊</span>';div.onclick=()=>{privateChatTarget=u;switchChatTab('private');const inp=document.getElementById('chatInput');if(inp)inp.placeholder='私聊 '+u.nickname+'...';};box.appendChild(div);});}
-function renderFriendsList(){const box=document.getElementById('chatMessages');if(!box)return;box.innerHTML='';if(friendsList.length===0){addSystemMsg('暂无好友，去在线列表添加吧！');return;}friendsList.forEach(f=>{const div=document.createElement('div');div.className='friend-item';div.innerHTML='<span><span class="status-dot '+(f.online?'status-online':'status-offline')+'"></span>'+escapeHtml(f.nickname)+'</span><span style="color:#4fc3f7;font-size:11px">'+(f.online?'私聊':'离线')+'</span>';if(f.online)div.onclick=()=>{privateChatTarget=f;switchChatTab('private');const inp=document.getElementById('chatInput');if(inp)inp.placeholder='私聊 '+f.nickname+'...';};box.appendChild(div);});}
-function switchChatTab(tab){chatTab=tab;document.querySelectorAll('.chat-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));const box=document.getElementById('chatMessages');if(!box)return;box.innerHTML='';if(tab==='online')renderOnlineUsers();else if(tab==='friends')renderFriendsList();else if(tab==='private')addSystemMsg(privateChatTarget?('正在和 '+privateChatTarget.nickname+' 私聊'):'点击在线用户或好友开始私聊');unreadCount=0;updateUnread();}
-function sendChatMessage(){const input=document.getElementById('chatInput');if(!input)return;const content=input.value.trim();if(!content||!chatSocket||!chatUser){blurChatInput();return;}if(chatTab==='private'&&privateChatTarget){chatSocket.emit('send_private_message',{receiverId:privateChatTarget.userId,content});}else{chatSocket.emit('send_world_message',{content});}input.value='';input.focus();}
-function focusChatInput(){const el=document.getElementById('chatInput');if(!el)return;el.focus();chatInputActive=true;for(const k in keys)keys[k]=false;}
-function blurChatInput(){const el=document.getElementById('chatInput');if(el)el.blur();chatInputActive=false;}
-function connectChat(){if(chatSocket)return;chatSocket=io(CHAT_URL,{transports:['websocket','polling']});chatSocket.on('auth_success',(data)=>{chatUser=data;const m=document.getElementById('chatAuthModal');if(m)m.classList.remove('show');const h=document.getElementById('chatHeader');if(h)h.firstElementChild.innerHTML='💬 '+escapeHtml(data.nickname)+' <span id="chatUnread" style="color:#ffd54f"></span>';addSystemMsg('欢迎，'+data.nickname+'！');chatSocket.emit('get_friends_list');});chatSocket.on('auth_error',({message})=>{const e=document.getElementById('chatAuthMsg');if(e)e.textContent=message;});chatSocket.on('receive_world_message',(data)=>{const p=document.getElementById('chatPanel');if(chatTab!=='world'||(p&&p.classList.contains('collapsed'))){unreadCount++;updateUnread();}if(chatTab==='world')addChatMsg('world',data);});chatSocket.on('receive_private_message',(data)=>{if(chatTab!=='private'){unreadCount++;updateUnread();}if(chatTab==='private')addChatMsg('private',data);});chatSocket.on('online_users',(users)=>{onlineUsersList=users;if(chatTab==='online')renderOnlineUsers();else if(chatTab==='friends')renderFriendsList();});chatSocket.on('friends_list',(friends)=>{friendsList=friends;if(chatTab==='friends')renderFriendsList();});}
-function showAuthModal(){if(!chatSocket)connectChat();const el=document.getElementById('chatAuthModal');if(el)el.classList.add('show');}
-document.getElementById('chatHeader').addEventListener('click',()=>{const p=document.getElementById('chatPanel');if(!p)return;p.classList.toggle('collapsed');const t=document.getElementById('chatToggle');if(t)t.textContent=p.classList.contains('collapsed')?'▲':'▼';if(!p.classList.contains('collapsed')){unreadCount=0;updateUnread();}if(!chatUser)showAuthModal();});
-document.querySelectorAll('.chat-tab').forEach(t=>{t.addEventListener('click',(e)=>{e.stopPropagation();if(chatUser)switchChatTab(t.dataset.tab);});});
-const ci=document.getElementById('chatInput');if(ci){ci.addEventListener('focus',focusChatInput);ci.addEventListener('blur',()=>{chatInputActive=false;});}
-const cs=document.getElementById('chatSend');if(cs)cs.addEventListener('click',(e)=>{e.stopPropagation();sendChatMessage();});
-const at=document.getElementById('authToggle');if(at)at.addEventListener('click',()=>{authMode=authMode==='login'?'register':'login';document.getElementById('authTitle').textContent=authMode==='login'?'登录聊天':'注册聊天';const n=document.getElementById('authNickname');if(n)n.style.display=authMode==='register'?'block':'none';document.getElementById('authSubmit').textContent=authMode==='login'?'登录':'注册';at.textContent=authMode==='login'?'没有账号？去注册':'已有账号？去登录';document.getElementById('chatAuthMsg').textContent='';});
-const as=document.getElementById('authSubmit');if(as)as.addEventListener('click',()=>{const u=document.getElementById('authUsername').value.trim();const p=document.getElementById('authPassword').value;if(!u||!p){document.getElementById('chatAuthMsg').textContent='请填写用户名和密码';return;}if(authMode==='register'){const n=document.getElementById('authNickname').value.trim();if(!n){document.getElementById('chatAuthMsg').textContent='请填写昵称';return;}chatSocket.emit('register',{username:u,password:p,nickname:n});}else{chatSocket.emit('login',{username:u,password:p});}});}
 requestAnimationFrame(animate);
 
 // 调试/测试暴露
@@ -1930,5 +2024,545 @@ window.gameDebug = {
   get balls() { return balls; }
 };
 </script>
+
+<!-- 连接状态 -->
+<div id="connStatus">● 未连接</div>
+
+<!-- 登录/注册界面 -->
+<div id="loginOverlay">
+  <div class="login-box">
+    <h2>⚽ 躺平足球3D - 社区</h2>
+    <div class="tab-bar">
+      <button id="loginTab" class="active" onclick="window.__chatSwitchTab('login')">登录</button>
+      <button id="registerTab" onclick="window.__chatSwitchTab('register')">注册</button>
+    </div>
+    <div id="loginForm">
+      <div class="form-group"><label>用户名</label><input id="loginUser" type="text" placeholder="输入用户名" autocomplete="username" /></div>
+      <div class="form-group"><label>密码</label><input id="loginPass" type="password" placeholder="输入密码" autocomplete="current-password" /></div>
+      <button class="submit-btn" onclick="window.__chatLogin()">登 录</button>
+    </div>
+    <div id="registerForm" style="display:none">
+      <div class="form-group"><label>用户名</label><input id="regUser" type="text" placeholder="用于登录的用户名" autocomplete="off" /></div>
+      <div class="form-group"><label>密码</label><input id="regPass" type="password" placeholder="设置密码" autocomplete="new-password" /></div>
+      <div class="form-group"><label>昵称（游戏内显示）</label><input id="regNick" type="text" placeholder="设置唯一昵称" autocomplete="off" /></div>
+      <button class="submit-btn" onclick="window.__chatRegister()">注 册</button>
+    </div>
+    <div class="login-error" id="loginError"></div>
+    <div class="login-status" id="loginStatus"></div>
+    <button class="skip-btn" onclick="window.__chatSkip()">跳过，先玩游戏</button>
+  </div>
+</div>
+
+<!-- 好友通知弹窗 -->
+<div id="friendNotifPopup"></div>
+
+<!-- 聊天面板 -->
+<div id="chatPanel" style="display:none">
+  <div id="chatToggle" onclick="window.__chatToggle()">
+    <span>💬 聊天 <span class="badge" id="chatBadge">0</span></span>
+    <span id="chatArrow">▼</span>
+  </div>
+  <div id="chatBody">
+    <div class="chat-tabs">
+      <button id="worldTab" class="active" onclick="window.__chatSwitchChat('world')">世界聊天</button>
+      <button id="privateTab" onclick="window.__chatSwitchChat('private')">私聊</button>
+    </div>
+    <div id="chatPrivateBar">
+      <select id="privateTarget" onchange="window.__chatChangePrivateTarget()">
+        <option value="">选择好友...</option>
+      </select>
+    </div>
+    <div id="chatMessages"></div>
+    <div id="chatInputArea">
+      <input id="chatInput" type="text" placeholder="输入消息..." maxlength="500" />
+      <button id="chatSendBtn" onclick="window.__chatSend()">发送</button>
+    </div>
+  </div>
+</div>
+
+<!-- 好友面板 -->
+<div id="friendPanel" style="display:none">
+  <div id="friendToggle" onclick="window.__friendToggle()">
+    <span>👥 好友 <span class="badge" id="friendBadge">0</span></span>
+    <span id="friendArrow">▼</span>
+  </div>
+  <div id="friendBody">
+    <div class="friend-tabs">
+      <button id="friendListTab" class="active" onclick="window.__friendSwitchTab('list')">好友列表</button>
+      <button id="friendReqTab" onclick="window.__friendSwitchTab('requests')">申请 <span id="reqCount" style="color:#ffd54f"></span></button>
+    </div>
+    <div id="friendSearchArea">
+      <input id="friendSearchInput" type="text" placeholder="搜索昵称添加好友..." maxlength="30" />
+    </div>
+    <div id="friendList"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ===== 配置 =====
+  const SERVER_URL = window.__CHAT_SERVER__ || 'https://football-chat-server-1.onrender.com';
+
+  // ===== 状态 =====
+  let socket = null;
+  let myUserId = null;
+  let myNickname = '';
+  let isAuthenticated = false;
+  let chatTab = 'world'; // 'world' | 'private'
+  let privateTargetId = null;
+  let friendTab = 'list'; // 'list' | 'requests'
+  let friends = []; // [{userId, nickname, avatar, online}]
+  let pendingRequests = []; // [{fromUserId, fromNickname, message, requestId}]
+  let chatCollapsed = false;
+  let friendCollapsed = false;
+  let unreadChat = 0;
+  let searchResults = [];
+
+  // ===== Socket 连接 =====
+  function connectSocket() {
+    if (socket) socket.disconnect();
+    try {
+      socket = io(SERVER_URL, { transports: ['websocket', 'polling'], reconnection: true, reconnectionDelay: 2000 });
+    } catch(e) {
+      updateConnStatus('disconnected');
+      return;
+    }
+
+    socket.on('connect', () => { updateConnStatus('connected'); });
+    socket.on('disconnect', () => { updateConnStatus('disconnected'); });
+    socket.on('connect_error', () => { updateConnStatus('disconnected'); });
+
+    // 认证
+    socket.on('auth_success', (data) => {
+      myUserId = data.userId;
+      myNickname = data.nickname;
+      isAuthenticated = true;
+      document.getElementById('loginOverlay').classList.add('hidden');
+      document.getElementById('chatPanel').style.display = '';
+      document.getElementById('friendPanel').style.display = '';
+      document.getElementById('loginError').textContent = '';
+      addSystemMessage('已登录为 ' + data.nickname);
+      socket.emit('get_friends_list');
+    });
+
+    socket.on('auth_error', (data) => {
+      document.getElementById('loginError').textContent = data.message || '认证失败';
+    });
+
+    // 世界聊天
+    socket.on('receive_world_message', (data) => {
+      if (chatTab === 'world') {
+        addChatMessage(data.senderName, data.content, data.timestamp, data.senderId === myUserId);
+      } else {
+        unreadChat++;
+        updateChatBadge();
+      }
+    });
+
+    // 私聊
+    socket.on('receive_private_message', (data) => {
+      if (chatTab === 'private' && privateTargetId === data.senderId) {
+        addChatMessage(data.senderName, data.content, data.timestamp, false, true);
+      } else {
+        unreadChat++;
+        updateChatBadge();
+        addSystemMessage('私聊来自 ' + data.senderName + ': ' + data.content);
+      }
+    });
+
+    // 搜索
+    socket.on('user_found', (data) => {
+      searchResults = [data];
+      renderSearchResult(data);
+    });
+
+    socket.on('user_not_found', () => {
+      searchResults = [];
+      var el = document.getElementById('friendList');
+      el.innerHTML = '<div style="padding:16px;text-align:center;color:rgba(255,255,255,0.4);font-size:12px">未找到该用户</div>';
+    });
+
+    // 好友申请
+    socket.on('receive_friend_request', (data) => {
+      pendingRequests.push(data);
+      showFriendRequestNotif(data);
+      updateReqCount();
+    });
+
+    socket.on('friend_request_accepted', (data) => {
+      friends.push({ userId: data.userId, nickname: data.nickname, avatar: '', online: true });
+      addSystemMessage(data.nickname + ' 通过了你的好友申请！');
+      renderFriends();
+      updatePrivateSelect();
+    });
+
+    socket.on('friend_request_rejected', (data) => {
+      addSystemMessage('对方拒绝了你的好友申请');
+    });
+
+    // 好友列表
+    socket.on('friends_list', (data) => {
+      friends = data || [];
+      renderFriends();
+      updatePrivateSelect();
+    });
+
+    // 在线状态
+    socket.on('online_users', (users) => {
+      var onlineIds = new Set(users.map(u => u.userId));
+      friends.forEach(f => { f.online = onlineIds.has(f.userId); });
+      renderFriends();
+      updatePrivateSelect();
+    });
+
+    socket.on('user_online', (data) => {
+      var f = friends.find(f => f.userId === data.userId);
+      if (f) { f.online = true; renderFriends(); updatePrivateSelect(); }
+    });
+
+    socket.on('user_offline', (data) => {
+      var f = friends.find(f => f.userId === data.userId);
+      if (f) { f.online = false; renderFriends(); updatePrivateSelect(); }
+    });
+  }
+
+  // ===== 连接状态 =====
+  function updateConnStatus(status) {
+    var el = document.getElementById('connStatus');
+    if (status === 'connected') {
+      el.className = 'connected';
+      el.textContent = '● 已连接';
+    } else {
+      el.className = 'disconnected';
+      el.textContent = '○ 未连接';
+    }
+  }
+
+  // ===== 登录/注册 =====
+  window.__chatSwitchTab = function(tab) {
+    document.getElementById('loginTab').classList.toggle('active', tab === 'login');
+    document.getElementById('registerTab').classList.toggle('active', tab === 'register');
+    document.getElementById('loginForm').style.display = tab === 'login' ? '' : 'none';
+    document.getElementById('registerForm').style.display = tab === 'register' ? '' : 'none';
+    document.getElementById('loginError').textContent = '';
+  };
+
+  window.__chatLogin = function() {
+    var u = document.getElementById('loginUser').value.trim();
+    var p = document.getElementById('loginPass').value;
+    if (!u || !p) { document.getElementById('loginError').textContent = '请填写用户名和密码'; return; }
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('loginStatus').textContent = '登录中...';
+    if (!socket || !socket.connected) connectSocket();
+    setTimeout(function() {
+      if (socket && socket.connected) {
+        socket.emit('login', { username: u, password: p });
+      } else {
+        document.getElementById('loginError').textContent = '无法连接服务器';
+      }
+      document.getElementById('loginStatus').textContent = '';
+    }, 500);
+  };
+
+  window.__chatRegister = function() {
+    var u = document.getElementById('regUser').value.trim();
+    var p = document.getElementById('regPass').value;
+    var n = document.getElementById('regNick').value.trim();
+    if (!u || !p || !n) { document.getElementById('loginError').textContent = '请填写所有字段'; return; }
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('loginStatus').textContent = '注册中...';
+    if (!socket || !socket.connected) connectSocket();
+    setTimeout(function() {
+      if (socket && socket.connected) {
+        socket.emit('register', { username: u, password: p, nickname: n });
+      } else {
+        document.getElementById('loginError').textContent = '无法连接服务器';
+      }
+      document.getElementById('loginStatus').textContent = '';
+    }, 500);
+  };
+
+  window.__chatSkip = function() {
+    document.getElementById('loginOverlay').classList.add('hidden');
+  };
+
+  // ===== 聊天面板 =====
+  window.__chatToggle = function() {
+    chatCollapsed = !chatCollapsed;
+    document.getElementById('chatPanel').classList.toggle('collapsed', chatCollapsed);
+    document.getElementById('chatArrow').textContent = chatCollapsed ? '▲' : '▼';
+  };
+
+  window.__chatSwitchChat = function(tab) {
+    chatTab = tab;
+    document.getElementById('worldTab').classList.toggle('active', tab === 'world');
+    document.getElementById('privateTab').classList.toggle('active', tab === 'private');
+    document.getElementById('chatPrivateBar').style.display = tab === 'private' ? '' : 'none';
+    document.getElementById('chatMessages').innerHTML = '';
+    if (tab === 'world') unreadChat = 0;
+    updateChatBadge();
+  };
+
+  function updateChatBadge() {
+    var el = document.getElementById('chatBadge');
+    if (unreadChat > 0) { el.style.display = ''; el.textContent = unreadChat > 99 ? '99+' : unreadChat; }
+    else { el.style.display = 'none'; }
+  }
+
+  function addChatMessage(sender, content, timestamp, isSelf, isPrivate) {
+    var container = document.getElementById('chatMessages');
+    var div = document.createElement('div');
+    div.className = 'chat-msg';
+    var time = '';
+    if (timestamp) {
+      var d = new Date(timestamp);
+      time = '<span class="time">' + d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0') + '</span>';
+    }
+    div.innerHTML = '<span class="sender ' + (isSelf ? 'self' : 'other') + '">' + escapeHtml(sender) + '</span> ' + escapeHtml(content) + time;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    // 限制消息数量
+    while (container.children.length > 200) container.removeChild(container.firstChild);
+  }
+
+  function addSystemMessage(text) {
+    var container = document.getElementById('chatMessages');
+    var div = document.createElement('div');
+    div.className = 'chat-msg system';
+    div.textContent = '— ' + text + ' —';
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  window.__chatSend = function() {
+    var input = document.getElementById('chatInput');
+    var content = input.value.trim();
+    if (!content) return;
+    if (!isAuthenticated || !socket || !socket.connected) { addSystemMessage('请先登录'); return; }
+
+    if (chatTab === 'world') {
+      socket.emit('send_world_message', { content: content });
+      addChatMessage(myNickname, content, Date.now(), true);
+    } else if (chatTab === 'private' && privateTargetId) {
+      socket.emit('send_private_message', { receiverId: privateTargetId, content: content });
+      var target = friends.find(function(f) { return f.userId === privateTargetId; });
+      addChatMessage('我 → ' + (target ? target.nickname : '对方'), content, Date.now(), true, true);
+    } else if (chatTab === 'private' && !privateTargetId) {
+      addSystemMessage('请先选择一个好友');
+    }
+    input.value = '';
+  };
+
+  window.__chatChangePrivateTarget = function() {
+    privateTargetId = document.getElementById('privateTarget').value || null;
+    document.getElementById('chatMessages').innerHTML = '';
+    if (privateTargetId) {
+      var target = friends.find(function(f) { return f.userId === privateTargetId; });
+      addSystemMessage('正在与 ' + (target ? target.nickname : '对方') + ' 私聊');
+    }
+  };
+
+  // 回车发送
+  document.getElementById('chatInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); window.__chatSend(); }
+    e.stopPropagation(); // 阻止触发游戏按键
+  });
+
+  // ===== 好友面板 =====
+  window.__friendToggle = function() {
+    friendCollapsed = !friendCollapsed;
+    document.getElementById('friendPanel').classList.toggle('collapsed', friendCollapsed);
+    document.getElementById('friendArrow').textContent = friendCollapsed ? '▲' : '▼';
+  };
+
+  window.__friendSwitchTab = function(tab) {
+    friendTab = tab;
+    document.getElementById('friendListTab').classList.toggle('active', tab === 'list');
+    document.getElementById('friendReqTab').classList.toggle('active', tab === 'requests');
+    if (tab === 'list') renderFriends();
+    else renderRequests();
+  };
+
+  function renderFriends() {
+    var el = document.getElementById('friendList');
+    if (friends.length === 0) {
+      el.innerHTML = '<div style="padding:20px;text-align:center;color:rgba(255,255,255,0.3);font-size:12px">暂无好友<br><span style="font-size:11px">在上方搜索昵称添加</span></div>';
+      return;
+    }
+    var html = '';
+    // 在线排前
+    var sorted = friends.slice().sort(function(a, b) { return (b.online ? 1 : 0) - (a.online ? 1 : 0); });
+    sorted.forEach(function(f) {
+      html += '<div class="friend-item">' +
+        '<span class="friend-dot ' + (f.online ? 'online' : 'offline') + '"></span>' +
+        '<span class="friend-nick">' + escapeHtml(f.nickname) + '</span>' +
+        '<div class="friend-actions">' +
+          '<button class="btn-msg" onclick="window.__friendMsg(' + f.userId + ')">聊</button>' +
+          '<button class="btn-remove" onclick="window.__friendRemove(' + f.userId + ')">✕</button>' +
+        '</div></div>';
+    });
+    el.innerHTML = html;
+  }
+
+  function renderRequests() {
+    var el = document.getElementById('friendList');
+    if (pendingRequests.length === 0) {
+      el.innerHTML = '<div style="padding:20px;text-align:center;color:rgba(255,255,255,0.3);font-size:12px">暂无好友申请</div>';
+      return;
+    }
+    var html = '';
+    pendingRequests.forEach(function(r) {
+      html += '<div class="friend-item" style="flex-direction:column;align-items:stretch;gap:6px">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span class="friend-nick" style="color:#ffd54f">' + escapeHtml(r.fromNickname) + '</span>' +
+        '</div>' +
+        (r.message ? '<div style="color:rgba(255,255,255,0.4);font-size:11px;padding-left:16px">"' + escapeHtml(r.message) + '"</div>' : '') +
+        '<div class="friend-actions" style="justify-content:flex-end">' +
+          '<button class="btn-accept" onclick="window.__friendAccept(' + r.requestId + ')">同意</button>' +
+          '<button class="btn-reject" onclick="window.__friendReject(' + r.requestId + ')">拒绝</button>' +
+        '</div></div>';
+    });
+    el.innerHTML = html;
+  }
+
+  function renderSearchResult(data) {
+    var el = document.getElementById('friendList');
+    var isSelf = data.userId === myUserId;
+    var isFriend = friends.some(function(f) { return f.userId === data.userId; });
+    var html = '<div class="search-result">' +
+      '<span class="nick">' + escapeHtml(data.nickname) + '</span>';
+    if (isSelf) {
+      html += '<span style="color:rgba(255,255,255,0.3);font-size:11px">这是你</span>';
+    } else if (isFriend) {
+      html += '<span style="color:#66bb6a;font-size:11px">已是好友</span>';
+    } else {
+      html += '<button class="btn-add" onclick="window.__friendAdd(' + data.userId + ')">添加</button>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  }
+
+  function updateReqCount() {
+    var el = document.getElementById('reqCount');
+    var badge = document.getElementById('friendBadge');
+    if (pendingRequests.length > 0) {
+      el.textContent = '(' + pendingRequests.length + ')';
+      badge.style.display = '';
+      badge.textContent = pendingRequests.length;
+    } else {
+      el.textContent = '';
+      badge.style.display = 'none';
+    }
+  }
+
+  function updatePrivateSelect() {
+    var sel = document.getElementById('privateTarget');
+    var current = sel.value;
+    sel.innerHTML = '<option value="">选择好友...</option>';
+    friends.forEach(function(f) {
+      var opt = document.createElement('option');
+      opt.value = f.userId;
+      opt.textContent = f.nickname + (f.online ? ' (在线)' : '');
+      sel.appendChild(opt);
+    });
+    if (current) sel.value = current;
+  }
+
+  // 搜索
+  var searchTimer = null;
+  document.getElementById('friendSearchInput').addEventListener('input', function(e) {
+    e.stopPropagation();
+    clearTimeout(searchTimer);
+    var val = this.value.trim();
+    if (!val) { if (friendTab === 'list') renderFriends(); else renderRequests(); return; }
+    searchTimer = setTimeout(function() {
+      if (!isAuthenticated || !socket || !socket.connected) return;
+      socket.emit('search_user', { nickname: val });
+    }, 400);
+  });
+  document.getElementById('friendSearchInput').addEventListener('keydown', function(e) { e.stopPropagation(); });
+
+  window.__friendAdd = function(targetUserId) {
+    if (!socket || !socket.connected) return;
+    var msg = prompt('发送好友申请（验证消息）：') || '';
+    socket.emit('send_friend_request', { targetUserId: targetUserId, message: msg });
+    addSystemMessage('已发送好友申请');
+    document.getElementById('friendSearchInput').value = '';
+    if (friendTab === 'list') renderFriends();
+  };
+
+  window.__friendAccept = function(requestId) {
+    if (!socket || !socket.connected) return;
+    socket.emit('accept_friend', { requestId: requestId });
+    pendingRequests = pendingRequests.filter(function(r) { return r.requestId !== requestId; });
+    updateReqCount();
+    if (friendTab === 'requests') renderRequests();
+  };
+
+  window.__friendReject = function(requestId) {
+    if (!socket || !socket.connected) return;
+    socket.emit('reject_friend', { requestId: requestId });
+    pendingRequests = pendingRequests.filter(function(r) { return r.requestId !== requestId; });
+    updateReqCount();
+    if (friendTab === 'requests') renderRequests();
+  };
+
+  window.__friendRemove = function(friendId) {
+    if (!confirm('确定删除该好友？')) return;
+    if (!socket || !socket.connected) return;
+    socket.emit('remove_friend', { friendId: friendId });
+    friends = friends.filter(function(f) { return f.userId !== friendId; });
+    renderFriends();
+    updatePrivateSelect();
+  };
+
+  window.__friendMsg = function(userId) {
+    // 切换到私聊标签并选择该好友
+    chatCollapsed = false;
+    document.getElementById('chatPanel').classList.remove('collapsed');
+    document.getElementById('chatArrow').textContent = '▼';
+    window.__chatSwitchChat('private');
+    document.getElementById('privateTarget').value = userId;
+    window.__chatChangePrivateTarget();
+  };
+
+  function showFriendRequestNotif(data) {
+    var popup = document.getElementById('friendNotifPopup');
+    popup.classList.add('show');
+    var card = document.createElement('div');
+    card.className = 'friend-notif-card';
+    card.innerHTML = '<div class="notif-title">新好友申请</div>' +
+      '<div class="notif-nick">' + escapeHtml(data.fromNickname) + '</div>' +
+      (data.message ? '<div class="notif-msg">"' + escapeHtml(data.message) + '"</div>' : '') +
+      '<div class="notif-btns">' +
+        '<button class="btn-accept" data-rid="' + data.requestId + '">同意</button>' +
+        '<button class="btn-reject" data-rid="' + data.requestId + '">拒绝</button>' +
+      '</div>';
+    card.querySelector('.btn-accept').addEventListener('click', function() { window.__friendAccept(this.dataset.rid); card.remove(); if (!popup.children.length) popup.classList.remove('show'); });
+    card.querySelector('.btn-reject').addEventListener('click', function() { window.__friendReject(this.dataset.rid); card.remove(); if (!popup.children.length) popup.classList.remove('show'); });
+    popup.appendChild(card);
+    // 自动消失
+    setTimeout(function() { card.remove(); if (!popup.children.length) popup.classList.remove('show'); }, 15000);
+  }
+
+  // ===== 工具 =====
+  function escapeHtml(str) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(str));
+    return d.innerHTML;
+  }
+
+  // ===== 初始化 =====
+  connectSocket();
+
+  // 暴露给外部
+  window.__chatSocket = function() { return socket; };
+  window.__chatState = function() { return { myUserId: myUserId, myNickname: myNickname, isAuthenticated: isAuthenticated }; };
+
+})();
+</script>
+
 </body>
 </html>
