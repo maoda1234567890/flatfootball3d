@@ -335,9 +335,9 @@ import * as THREE from 'three';
 const BALL_R = 0.4;
 const PLAYER_R = 0.7, PLAYER_H = 0.4;
 const LEG_LEN = 0.9;
-const GRAVITY = -15;
+const GRAVITY = -18;
 const MOVE_SPEED = 28;
-const KICK_FORCE = 25;
+const KICK_FORCE = 30;
 const BALL_FRIC = 0.992;
 const BALL_GROUND_FRIC = 0.982;
 const PLAYER_FRIC = 0.93;
@@ -1567,7 +1567,7 @@ class PlayerState {
   _kick(foot, bs, ball, kicking, br) { const dx = ball.mesh.position.x - foot.x, dy = ball.mesh.position.y - foot.y, dz = ball.mesh.position.z - foot.z, dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
     if (dist < br + 0.4 && kicking) { bs.lastTouch = this; const nd = dist || 1; const ra = (Math.random() - 0.5) * 1.2, cr = Math.cos(ra), sr = Math.sin(ra);
       const dirX = dx / nd, dirZ = dz / nd; const km = this.buffs.bigKick > 0 ? 2.5 : 1.0;
-      bs.vx += (dirX * cr - dirZ * sr) * KICK_FORCE * km + this.vx * 0.2; bs.vy += 2.5 * km; bs.vz += (dirX * sr + dirZ * cr) * KICK_FORCE * km + this.vz * 0.2;
+      bs.vx += (dirX * cr - dirZ * sr) * KICK_FORCE * km + this.vx * 0.2; bs.vy += 1.5 * km; bs.vz += (dirX * sr + dirZ * cr) * KICK_FORCE * km + this.vz * 0.2;
       bs.spinX = (Math.random() - 0.5) * 8; bs.spinY = (Math.random() - 0.5) * 6; bs.spinZ = (Math.random() - 0.5) * 8; sndKick(); } }
   collidePlayer(other) { if (this.dead || other.dead) return;
     const dx = this.x - other.x, dz = this.z - other.z, dist = Math.sqrt(dx * dx + dz * dz), md = PLAYER_R * 1.8;
@@ -1636,7 +1636,7 @@ const SERVER_URL = 'https://flatfootball3d-server.onrender.com';
 
 function connectSocket() {
   if (socket) return;
-  socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
+  socket = io(SERVER_URL, {   transports: ['websocket', 'polling'],   reconnection: true,   reconnectionDelay: 2000,   reconnectionAttempts: 10,   pingInterval: 5000,   pingTimeout: 10000 });
   socket.on('connect', () => {
     document.getElementById('roomStatus').textContent = '已连接到服务器';
   });
@@ -2082,7 +2082,7 @@ function goal(team, scoringBall) {
   if (gameState.score[team - 1] >= WIN_SCORE) showVictory(team);
 }
 
-function checkBallGoal(ball) {
+function checkBallGoal(ball) {   const br = ball._radius;   for (const gs of goalSegments) {     const edge = fieldEdges[gs.edgeIdx];     const sd = signedDistToEdge(ball.mesh.position.x, ball.mesh.position.z, edge);     if (sd < -br) {       const t = projectOnEdge(ball.mesh.position.x, ball.mesh.position.z, edge);       if (t >= gs.t1 && t <= gs.t2 && ball.mesh.position.y < GOAL_H + br) {         goal(gs.team, ball);         return true;       }     }   }   return false; }
   const br = ball._radius;
   for (const gs of goalSegments) {
     const edge = fieldEdges[gs.edgeIdx];
@@ -2299,6 +2299,26 @@ window.gameDebug = {
   get socket() { return socket; },
   get balls() { return balls; }
 };
+ // ===== MVP 更新 =====
+function updateMVP() {
+  let bestPlayer = null;
+  let bestScore = -Infinity;
+  for (const p of allPlayers) {
+    const score = (p.kills || 0) - (p.deaths || 0);
+    if (score > bestScore) {
+      bestScore = score;
+      bestPlayer = p;
+    }
+  }
+  const el = document.getElementById('mvpDisplay');
+  if (bestPlayer) {
+    const name = bestPlayer === p1 ? 'P1' : bestPlayer === p2 ? 'P2' : bestPlayer === ai1 ? 'AI1' : 'AI2';
+    el.textContent = `🏆 MVP: ${name} (${bestScore})`;
+  } else {
+    el.textContent = '🏆 MVP: --';
+  }
+}
+setInterval(updateMVP, 60000);
 </script>
 
 <div id="connStatus">● 未连接</div>
