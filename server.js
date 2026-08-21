@@ -13,6 +13,7 @@ const io = new Server(server, {
 app.use(express.static(path.join(__dirname)));
 
 // 房间管理
+
 const rooms = {};
 
 function getRoom(roomId) {
