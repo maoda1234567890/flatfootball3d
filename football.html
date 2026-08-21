@@ -349,6 +349,14 @@
   </div>
   <input id="roomInput" type="text" placeholder="输入房间号" maxlength="10" />
   <button id="btnConfirm">确认</button>
+  <button id="btnServerCfg" title="配置服务器地址" style="background:#666;color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:14px">⚙️</button>
+  <div id="serverCfgPanel" style="display:none;margin-top:8px">
+    <input id="serverUrlInput" type="text" placeholder="服务器地址 (如 https://xxx.onrender.com)" style="width:100%;padding:6px;border-radius:6px;border:1px solid #555;background:#333;color:#fff;font-size:12px" />
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <button id="btnSaveServer" style="flex:1;padding:6px;border:none;border-radius:6px;background:#4fc3f7;color:#000;font-weight:bold;cursor:pointer">保存并刷新</button>
+      <button id="btnResetServer" style="padding:6px;border:none;border-radius:6px;background:#555;color:#ccc;cursor:pointer">重置</button>
+    </div>
+  </div>
   <div id="roomStatus"></div>
 </div>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -1669,10 +1677,10 @@ function queueNetEvent(type, data) { if (mpMode === 'host' && socket) netEventQu
 const clientEntityMap = { powerup: new Map(), boss: new Map() };
 let clientFieldReady = false;
 let hostFieldSent = false;
-// 优先使用当前页面 origin（部署到 Render 后自动适配），开发时可改为本地地址
-// 如需独立部署联机服务器，取消下一行注释并填写服务器地址
-// const SERVER_URL = 'https://你的服务器地址.onrender.com';
-const SERVER_URL = window.location.origin;
+// ===== 服务器地址配置（保存到 localStorage）=====
+// 在联机面板上点击房间号输入框旁的配置按钮可修改
+const DEFAULT_SERVER = 'https://flatfootball3d.onrender.com';
+const SERVER_URL = localStorage.getItem('football_server_url') || DEFAULT_SERVER;
 
 function connectSocket() {
   if (socket) {
@@ -2092,6 +2100,42 @@ document.getElementById('btnJoin').onclick = () => {
   pendingAction = 'join';
   roomStatus.textContent = '输入房间号后点击确认加入';
   document.getElementById('btnConfirm').textContent = '加入房间';
+};
+
+// ===== 服务器地址配置（localStorage 持久化）=====
+const btnServerCfg = document.getElementById('btnServerCfg');
+const serverCfgPanel = document.getElementById('serverCfgPanel');
+const serverUrlInput = document.getElementById('serverUrlInput');
+const btnSaveServer = document.getElementById('btnSaveServer');
+const btnResetServer = document.getElementById('btnResetServer');
+
+// 初始化输入框显示当前地址
+serverUrlInput.value = SERVER_URL === DEFAULT_SERVER ? '' : SERVER_URL;
+serverUrlInput.placeholder = `服务器地址（默认：${DEFAULT_SERVER}）`;
+
+btnServerCfg.onclick = () => {
+  serverCfgPanel.style.display = serverCfgPanel.style.display === 'none' ? 'block' : 'none';
+};
+
+btnSaveServer.onclick = () => {
+  const url = serverUrlInput.value.trim();
+  if (url) {
+    localStorage.setItem('football_server_url', url);
+    localStorage.setItem('football_chat_server_url', url);
+    roomStatus.textContent = `服务器地址已保存：${url}，刷新页面生效`;
+    // 自动刷新使新地址生效
+    setTimeout(() => location.reload(), 800);
+  } else {
+    btnResetServer.click();
+  }
+};
+
+btnResetServer.onclick = () => {
+  localStorage.removeItem('football_server_url');
+  localStorage.removeItem('football_chat_server_url');
+  serverUrlInput.value = '';
+  roomStatus.textContent = '已恢复默认地址，刷新页面生效';
+  setTimeout(() => location.reload(), 500);
 };
 document.getElementById('btnConfirm').onclick = () => {
   // 优先处理已加入房间后的操作（基于 mpMode 状态）
@@ -2541,9 +2585,9 @@ window.gameDebug = {
   'use strict';
 
   // ===== 配置 =====
-  // 聊天服务器：默认使用当前页面 origin（与游戏服务器同部署时自动适配）
-  // 如需独立聊天服务器，可通过 window.__CHAT_SERVER__ 覆盖
-  const SERVER_URL = window.__CHAT_SERVER__ || window.location.origin;
+  // 聊天服务器地址（优先读取 localStorage，其次使用游戏服务器地址）
+  const DEFAULT_CHAT_SERVER = 'https://flatfootball3d.onrender.com';
+  const SERVER_URL = window.__CHAT_SERVER__ || localStorage.getItem('football_chat_server_url') || DEFAULT_CHAT_SERVER;
 
   // ===== 状态 =====
   let socket = null;
