@@ -96,8 +96,12 @@
   #multiplayerPanel button {
     padding: 10px 24px; font-size: 16px; border-radius: 8px; border: none;
     cursor: pointer; background: #4fc3f7; color: #000; font-weight: bold;
+    transition: background 0.2s, opacity 0.2s;
   }
-  #multiplayerPanel button:hover { background: #29b6f6; }
+  #multiplayerPanel button:hover:not(:disabled) { background: #29b6f6; }
+  #multiplayerPanel button:disabled {
+    background: #555; color: #999; cursor: not-allowed; opacity: 0.6;
+  }
   #multiplayerPanel #roomStatus { color: #aaa; font-size: 14px; min-height: 20px; }
   #multiplayerPanel .mode-btns { display: flex; gap: 12px; }
 
@@ -286,12 +290,35 @@
 
 /* 连接状态指示 */
 #connStatus {
-  position: fixed; top: 12px; right: 12px; z-index: 55;
+  position: fixed; top: 64px; right: 12px; z-index: 55;
   padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
   background: rgba(0,0,0,0.6); color: #666; display: none;
 }
 #connStatus.connected { color: #66bb6a; display: block; }
 #connStatus.disconnected { color: #ef5350; display: block; }
+
+/* ===== 右上角音乐开关按钮 ===== */
+#musicBtn {
+  position: fixed; top: 12px; right: 12px; z-index: 60;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #fff; font-size: 20px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s, transform 0.15s, opacity 0.2s;
+  pointer-events: auto;
+}
+#musicBtn:hover { background: rgba(0,0,0,0.8); transform: scale(1.08); }
+#musicBtn:active { transform: scale(0.95); }
+#musicBtn.muted { opacity: 0.45; }
+#musicBtn .wave {
+  position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; color: #4fc3f7; white-space: nowrap;
+  display: none;
+}
+#musicBtn:not(.muted) .wave { display: block; }
 </style>
 </head>
 <body>
@@ -1642,45 +1669,113 @@ function queueNetEvent(type, data) { if (mpMode === 'host' && socket) netEventQu
 const clientEntityMap = { powerup: new Map(), boss: new Map() };
 let clientFieldReady = false;
 let hostFieldSent = false;
-// 本地测试时保持 window.location.origin；部署到 GitHub Pages 后请改为你的联机服务器地址
-const SERVER_URL = 'https://flatfootball3d-server.onrender.com';
+// 优先使用当前页面 origin（部署到 Render 后自动适配），开发时可改为本地地址
+// 如需独立部署联机服务器，取消下一行注释并填写服务器地址
+// const SERVER_URL = 'https://你的服务器地址.onrender.com';
+const SERVER_URL = window.location.origin;
 
 function connectSocket() {
-  if (socket) return;
+  if (socket) {
+    // 如果 socket 已存在但断开，尝试重新连接
+    if (!socket.connected) {
+      socket.connect();
+    }
+    return;
+  }
   socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
   socket.on('connect', () => {
     document.getElementById('roomStatus').textContent = '已连接到服务器';
   });
   socket.on('disconnect', () => {
     document.getElementById('roomStatus').textContent = '与服务器的连接已断开';
+    // 重置 UI 状态，允许用户重新操作
+    mpMode = 'local';
+    localReady = false;
+    mpPanel.style.display = 'flex';
+    document.getElementById('btnConfirm').disabled = false;
+    document.getElementById('btnConfirm').textContent = '开始游戏';
+    // 注意：不断开 socket 引用，connectSocket() 会通过 socket.connect() 重连
   });
   socket.on('errorMsg', (msg) => {
     document.getElementById('roomStatus').textContent = msg;
+    // 发生错误时重置房间状态，允许用户重新操作
+    mpMode = 'local';
+    localReady = false;
+    document.getElementById('btnConfirm').disabled = false;
+    // 根据当前 pendingAction 恢复按钮文字
+    if (pendingAction === 'create') {
+      document.getElementById('btnConfirm').textContent = '创建房间';
+    } else if (pendingAction === 'join') {
+      document.getElementById('btnConfirm').textContent = '加入房间';
+    } else {
+      document.getElementById('btnConfirm').textContent = '开始游戏';
+    }
   });
   socket.on('joinedRoom', ({ slot, isHost }) => {
     mySlot = slot;
     mpMode = isHost ? 'host' : 'client';
-    document.getElementById('roomStatus').textContent = `已${isHost ? '创建' : '加入'}房间 ${roomId}，你是 ${slot === 0 ? 'P1（蓝队）' : 'P2（红队）'}`;
+    const label = isHost ? '创建' : '加入';
+    const teamLabel = slot === 0 ? 'P1（蓝队）' : 'P2（红队）';
+    document.getElementById('roomStatus').textContent = `已${label}房间 ${roomId}，你是 ${teamLabel}`;
+    // 设置初始按钮文字，roomUpdate 会根据玩家数量更新
     if (isHost) {
       document.getElementById('btnConfirm').textContent = '等待玩家加入...';
+      document.getElementById('btnConfirm').disabled = true;
     } else {
       document.getElementById('btnConfirm').textContent = '准备';
+      document.getElementById('btnConfirm').disabled = false;
     }
   });
   socket.on('roomUpdate', (players) => {
     netState.players = players;
     const count = Object.keys(players).length;
-    if (mpMode === 'host' && count === 2) {
-      document.getElementById('roomStatus').textContent = '玩家已加入，点击开始';
-      document.getElementById('btnConfirm').textContent = '开始游戏';
-    } else if (mpMode === 'client' && !localReady) {
-      document.getElementById('roomStatus').textContent = count === 2 ? '房间已满，点击准备' : '等待另一名玩家';
+    if (mpMode === 'host') {
+      if (count >= 2) {
+        document.getElementById('roomStatus').textContent = '玩家已加入，点击开始';
+        document.getElementById('btnConfirm').textContent = '开始游戏';
+        document.getElementById('btnConfirm').disabled = false;
+      } else {
+        document.getElementById('roomStatus').textContent = `已创建房间 ${roomId}，等待另一名玩家加入...`;
+        document.getElementById('btnConfirm').textContent = '等待玩家加入...';
+        document.getElementById('btnConfirm').disabled = true;
+      }
+    } else if (mpMode === 'client') {
+      if (!localReady) {
+        document.getElementById('roomStatus').textContent = count >= 2 ? '房间已满，点击准备' : '等待另一名玩家';
+        document.getElementById('btnConfirm').textContent = '准备';
+        document.getElementById('btnConfirm').disabled = false;
+      }
     }
   });
   socket.on('startGame', () => {
     gameState.started = true;
     document.getElementById('multiplayerPanel').style.display = 'none';
-    initAudio(); bgMusicOn = true;
+    if (!audioCtx) { initAudio(); }
+    bgMusicOn = true;
+  });
+  socket.on('playerDisconnected', (disconnectedId) => {
+    const wasHost = mpMode === 'host';
+    mpMode = 'local';
+    localReady = false;
+    document.getElementById('btnConfirm').disabled = false;
+    // 重新显示联机面板
+    mpPanel.style.display = 'flex';
+    // 如果房主断开，所有人重置；如果玩家断开，房主等待
+    if (wasHost) {
+      document.getElementById('roomStatus').textContent = '房主已断开连接';
+      document.getElementById('btnConfirm').textContent = '开始游戏';
+    } else {
+      document.getElementById('roomStatus').textContent = '对方玩家已断开，返回大厅';
+      document.getElementById('btnConfirm').textContent = '开始游戏';
+    }
+    // 重置游戏状态
+    gameState.started = false;
+    gameState.score = [0, 0];
+    gameState.kills = [0, 0];
+    document.getElementById('s1').textContent = '0';
+    document.getElementById('s2').textContent = '0';
+    document.getElementById('k1').textContent = '0';
+    document.getElementById('k2').textContent = '0';
   });
   socket.on('gameState', (data) => applyHostState(data));
   socket.on('playerInput', ({ id, slot, input }) => {
@@ -1999,13 +2094,40 @@ document.getElementById('btnJoin').onclick = () => {
   document.getElementById('btnConfirm').textContent = '加入房间';
 };
 document.getElementById('btnConfirm').onclick = () => {
+  // 优先处理已加入房间后的操作（基于 mpMode 状态）
+  if (mpMode === 'host') {
+    const count = Object.keys(netState.players).length;
+    if (count >= 2) {
+      // 房主：两名玩家已到位，开始游戏
+      hostFieldSent = false;
+      socket.emit('startGameByHost');
+      gameState.started = true;
+      mpPanel.style.display = 'none';
+      if (!audioCtx) { initAudio(); }
+      bgMusicOn = true;
+    } else {
+      roomStatus.textContent = '等待另一名玩家加入...';
+    }
+    return;
+  }
+  if (mpMode === 'client') {
+    if (!localReady) {
+      localReady = true;
+      socket.emit('ready');
+      document.getElementById('btnConfirm').textContent = '已准备';
+      roomStatus.textContent = '已准备，等待房主开始';
+    }
+    return;
+  }
+  // 初始状态：pendingAction 决定是本地/创建/加入
   roomId = roomInput.value.trim();
-  if (!roomId) { roomStatus.textContent = '请输入房间号'; return; }
+  if (!roomId && pendingAction !== 'local') { roomStatus.textContent = '请输入房间号'; return; }
   if (pendingAction === 'local') {
     mpMode = 'local';
     gameState.started = true;
     mpPanel.style.display = 'none';
-    initAudio(); bgMusicOn = true;
+    if (!audioCtx) { initAudio(); }
+    bgMusicOn = true;
   } else if (pendingAction === 'create') {
     if (!socket) connectSocket();
     if (!socket.connected) {
@@ -2020,18 +2142,6 @@ document.getElementById('btnConfirm').onclick = () => {
     } else {
       socket.emit('joinRoom', { roomId, playerName: '玩家' });
     }
-  } else if (mpMode === 'host' && Object.keys(netState.players).length >= 1) {
-    hostFieldSent = false;
-    socket.emit('startGameByHost');
-    socket.emit('startGame');
-    gameState.started = true;
-    mpPanel.style.display = 'none';
-    initAudio(); bgMusicOn = true;
-  } else if (mpMode === 'client' && !localReady) {
-    localReady = true;
-    socket.emit('ready');
-    document.getElementById('btnConfirm').textContent = '已准备';
-    roomStatus.textContent = '已准备，等待房主开始';
   }
 };
 
@@ -2087,6 +2197,27 @@ function updateBGMusic(dt) {
     bgBeatTimer = BG_BEAT_LEN;
   }
 }
+
+// ===== 音乐开关按钮 =====
+const musicBtn = document.getElementById('musicBtn');
+const musicIcon = document.getElementById('musicIcon');
+// 默认开启音乐（进入游戏时由 initAudio 触发）
+musicBtn.addEventListener('click', () => {
+  // 确保音频上下文已初始化
+  if (!audioCtx) { initAudio(); }
+  if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume(); }
+  bgMusicOn = !bgMusicOn;
+  if (bgMusicOn) {
+    musicIcon.textContent = '🎵';
+    musicBtn.classList.remove('muted');
+    // 重置节拍指针让音乐从头开始
+    bgBeatIdx = 0;
+    bgBeatTimer = 0;
+  } else {
+    musicIcon.textContent = '🔇';
+    musicBtn.classList.add('muted');
+  }
+});
 
 // ===== 输入 =====
 const keys = {};
@@ -2329,6 +2460,11 @@ window.gameDebug = {
 
 <!-- 连接状态 -->
 <div id="connStatus">● 未连接</div>
+<!-- 右上角音乐开关 -->
+<button id="musicBtn" title="音乐开关">
+  <span id="musicIcon">🎵</span>
+  <span class="wave">♪ ♪</span>
+</button>
 
 <!-- 登录/注册界面 -->
 <div id="loginOverlay">
@@ -2405,7 +2541,9 @@ window.gameDebug = {
   'use strict';
 
   // ===== 配置 =====
-  const SERVER_URL = window.__CHAT_SERVER__ || 'https://football-chat-server-1.onrender.com';
+  // 聊天服务器：默认使用当前页面 origin（与游戏服务器同部署时自动适配）
+  // 如需独立聊天服务器，可通过 window.__CHAT_SERVER__ 覆盖
+  const SERVER_URL = window.__CHAT_SERVER__ || window.location.origin;
 
   // ===== 状态 =====
   let socket = null;
