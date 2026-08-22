@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<title>躺平足球3D - FlatFootball3D</title>
+<title>Nuke Football</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; overflow: hidden; background: #111; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
@@ -341,7 +341,7 @@
   <div class="ctrl"><b style="color:#ef5350">P2</b> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>爬行 <kbd>1</kbd>左腿 <kbd>2</kbd>右腿 <kbd>/</kbd>使用道具 <kbd>.</kbd>冲锋枪 <kbd>,</kbd>狙击枪 <kbd>0</kbd>手雷</div>
 </div>
 <div id="multiplayerPanel">
-  <h2>躺平足球3D 联机版</h2>
+  <h2>Nuke Football足球3D 联机版</h2>
   <div class="mode-btns">
     <button id="btnLocal">单人/本地双人</button>
     <button id="btnCreate">创建房间</button>
@@ -1679,7 +1679,7 @@ let clientFieldReady = false;
 let hostFieldSent = false;
 // ===== 服务器地址配置（保存到 localStorage）=====
 // 在联机面板上点击房间号输入框旁的配置按钮可修改
-const DEFAULT_SERVER = 'https://flatfootball3d.onrender.com';
+const DEFAULT_SERVER = 'https://https://nuke-football.onrender.com';
 const SERVER_URL = localStorage.getItem('football_server_url') || DEFAULT_SERVER;
 
 function connectSocket() {
@@ -2521,7 +2521,7 @@ window.gameDebug = {
 <!-- 登录/注册界面 -->
 <div id="loginOverlay">
   <div class="login-box">
-    <h2>⚽ 躺平足球3D - 社区</h2>
+    <h2>⚽ Nuke Football - 社区</h2>
     <div class="tab-bar">
       <button id="loginTab" class="active" onclick="window.__chatSwitchTab('login')">登录</button>
       <button id="registerTab" onclick="window.__chatSwitchTab('register')">注册</button>
@@ -2594,7 +2594,7 @@ window.gameDebug = {
 
   // ===== 配置 =====
   // 聊天服务器地址（优先读取 localStorage，其次使用游戏服务器地址）
-  const DEFAULT_CHAT_SERVER = 'https://flatfootball3d.onrender.com';
+  const DEFAULT_CHAT_SERVER = 'https://https://https://nuke-football.onrender.com';
   const SERVER_URL = window.__CHAT_SERVER__ || localStorage.getItem('football_chat_server_url') || DEFAULT_CHAT_SERVER;
 
   // ===== 状态 =====
