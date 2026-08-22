@@ -1,0 +1,3346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>躺平足球3D - FlatFootball3D</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; background: #111; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+  canvas { display: block; }
+  #ui {
+    position: fixed; top: 0; left: 0; width: 100%; pointer-events: none; z-index: 10;
+    display: flex; justify-content: center; padding: 12px;
+  }
+  #scoreboard {
+    display: flex; gap: 16px; align-items: center;
+    background: rgba(0,0,0,0.7); padding: 8px 28px; border-radius: 12px;
+    color: #fff; font-size: 16px; font-weight: bold;
+    backdrop-filter: blur(6px);
+  }
+  .team1 { color: #4fc3f7; } .team2 { color: #ef5350; }
+  .score { font-size: 28px; } .vs { color: #ffd54f; font-size: 18px; }
+  #goalMsg {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 72px; font-weight: bold; color: #ffd54f;
+    text-shadow: 0 0 40px rgba(255,213,79,0.8), 0 4px 12px rgba(0,0,0,0.6);
+    pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 20;
+  }
+  #goalMsg.show { opacity: 1; }
+  #controls {
+    position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 20px; color: rgba(255,255,255,0.6); font-size: 11px;
+    pointer-events: none; z-index: 10; flex-wrap: wrap; justify-content: center;
+  }
+  .ctrl { background: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 6px; }
+  kbd { background: rgba(255,255,255,0.15); border-radius: 3px; padding: 1px 4px; }
+  #startMsg {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 26px; color: #fff; text-align: center;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.6); pointer-events: none; z-index: 20;
+  }
+  #victoryOverlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    display: none; z-index: 50; pointer-events: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.5);
+  }
+  #victoryOverlay.show { display: flex; }
+  #victoryText {
+    font-size: 80px; font-weight: bold;
+    text-shadow: 0 0 60px rgba(255,213,79,0.9), 0 6px 20px rgba(0,0,0,0.8);
+    animation: victoryPulse 0.5s ease-in-out infinite alternate;
+  }
+  @keyframes victoryPulse { from { transform: scale(1); } to { transform: scale(1.1); } }
+  #victorySub { font-size: 24px; color: #fff; margin-top: 20px; text-shadow: 0 2px 8px rgba(0,0,0,0.6); }
+  #victoryRestart { margin-top: 30px; font-size: 18px; color: rgba(255,255,255,0.6); }
+  #powerupMsg {
+    position: fixed; top: 60%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 28px; font-weight: bold; pointer-events: none; opacity: 0;
+    transition: opacity 0.3s; z-index: 20; text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+  #powerupMsg.show { opacity: 1; }
+  #buffLeft, #buffRight {
+    position: fixed; top: 60px; pointer-events: none; z-index: 10;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  #buffLeft { left: 12px; } #buffRight { right: 12px; }
+  .buff-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .buff-icon {
+    width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center;
+    justify-content: center; font-size: 18px; background: rgba(0,0,0,0.7);
+    position: relative; overflow: hidden;
+  }
+  .buff-icon .fill {
+    position: absolute; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.2);
+    transition: height 0.1s;
+  }
+  .buff-icon span { position: relative; z-index: 1; }
+  .ammo-count { position: absolute; bottom: -1px; right: 1px; font-size: 9px; color: #fff; z-index: 2; text-shadow: 0 0 2px #000; }
+  .buff-label { color: rgba(255,255,255,0.7); font-size: 12px; font-weight: bold; text-align: center; margin-bottom: 2px; }
+  #respawnBar {
+    position: fixed; top: 48px; left: 0; width: 100%; pointer-events: none; z-index: 12;
+    display: flex; justify-content: center; gap: 20px;
+  }
+  .respawn-tag { font-size: 18px; font-weight: bold; padding: 2px 12px; border-radius: 6px; background: rgba(0,0,0,0.6); }
+  #multiplayerPanel {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85); z-index: 100;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #fff; gap: 16px;
+  }
+  #multiplayerPanel h2 { font-size: 32px; margin-bottom: 10px; }
+  #multiplayerPanel input {
+    padding: 10px 16px; font-size: 18px; border-radius: 8px; border: none;
+    width: 260px; text-align: center;
+  }
+  #multiplayerPanel button {
+    padding: 10px 24px; font-size: 16px; border-radius: 8px; border: none;
+    cursor: pointer; background: #4fc3f7; color: #000; font-weight: bold;
+    transition: background 0.2s, opacity 0.2s;
+  }
+  #multiplayerPanel button:hover:not(:disabled) { background: #29b6f6; }
+  #multiplayerPanel button:disabled {
+    background: #555; color: #999; cursor: not-allowed; opacity: 0.6;
+  }
+  #multiplayerPanel #roomStatus { color: #aaa; font-size: 14px; min-height: 20px; }
+  #multiplayerPanel .mode-btns { display: flex; gap: 12px; }
+
+/* ===== 聊天 & 好友系统样式 ===== */
+#loginOverlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.92); z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+}
+#loginOverlay.hidden { display: none; }
+.login-box {
+  background: rgba(20,20,30,0.95); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px; padding: 36px 40px; width: 400px; max-width: 92vw;
+  backdrop-filter: blur(12px); box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+}
+.login-box h2 { color: #fff; text-align: center; margin-bottom: 24px; font-size: 22px; }
+.login-box .tab-bar { display: flex; gap: 0; margin-bottom: 20px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.15); }
+.login-box .tab-bar button {
+  flex: 1; padding: 10px; border: none; cursor: pointer; font-size: 14px; font-weight: 600;
+  background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.5); transition: all 0.2s;
+}
+.login-box .tab-bar button.active { background: #4fc3f7; color: #000; }
+.login-box .form-group { margin-bottom: 14px; }
+.login-box .form-group label { display: block; color: rgba(255,255,255,0.6); font-size: 12px; margin-bottom: 4px; }
+.login-box .form-group input {
+  width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06); color: #fff; font-size: 14px; outline: none; transition: border 0.2s;
+}
+.login-box .form-group input:focus { border-color: #4fc3f7; }
+.login-box .submit-btn {
+  width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer;
+  background: linear-gradient(135deg, #4fc3f7, #29b6f6); color: #000; font-size: 15px;
+  font-weight: 700; margin-top: 8px; transition: opacity 0.2s;
+}
+.login-box .submit-btn:hover { opacity: 0.85; }
+.login-box .skip-btn {
+  width: 100%; padding: 10px; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+  cursor: pointer; background: transparent; color: rgba(255,255,255,0.5); font-size: 13px;
+  margin-top: 10px; transition: all 0.2s;
+}
+.login-box .skip-btn:hover { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.8); }
+.login-box .forgot-link {
+  text-align: right; margin-top: -6px; margin-bottom: 10px;
+}
+.login-box .forgot-link a {
+  color: #4fc3f7; font-size: 12px; text-decoration: none; cursor: pointer;
+}
+.login-box .forgot-link a:hover { text-decoration: underline; }
+.login-box .verify-row { display: flex; gap: 8px; }
+.login-box .verify-row input { flex: 1; }
+.login-box .verify-btn {
+  padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.06); color: #4fc3f7; font-size: 13px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; transition: all 0.2s; min-width: 120px;
+}
+.login-box .verify-btn:hover:not(:disabled) { background: rgba(79,195,247,0.15); border-color: #4fc3f7; }
+.login-box .verify-btn:disabled {
+  background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.3);
+  cursor: not-allowed; border-color: rgba(255,255,255,0.08);
+}
+.login-box .back-link {
+  text-align: center; margin-top: 6px;
+}
+.login-box .back-link a {
+  color: rgba(255,255,255,0.4); font-size: 12px; text-decoration: none; cursor: pointer;
+}
+.login-box .back-link a:hover { color: rgba(255,255,255,0.7); }
+.login-box .guest-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  background: rgba(255,213,79,0.15); color: #ffd54f; font-size: 11px; font-weight: 600;
+  margin-left: 6px;
+}
+.login-error { color: #ef5350; font-size: 12px; text-align: center; min-height: 18px; margin-top: 8px; }
+.login-status { color: #aaa; font-size: 12px; text-align: center; margin-top: 6px; }
+
+/* 聊天窗口 */
+#chatPanel {
+  position: fixed; bottom: 12px; right: 12px; width: 320px; z-index: 60;
+  display: flex; flex-direction: column; font-size: 13px;
+}
+#chatPanel.collapsed #chatBody { display: none; }
+#chatToggle {
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+  padding: 8px 14px; border-radius: 10px 10px 0 0; cursor: pointer;
+  color: #fff; font-weight: 600; font-size: 13px; user-select: none;
+  border: 1px solid rgba(255,255,255,0.08); border-bottom: none;
+}
+#chatToggle .badge { background: #ef5350; color: #fff; border-radius: 10px; padding: 1px 7px; font-size: 11px; margin-left: 6px; display: none; }
+#chatBody {
+  background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.08); border-top: none;
+  border-radius: 0 0 10px 10px; display: flex; flex-direction: column; height: 400px;
+}
+.chat-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.chat-tabs button {
+  flex: 1; padding: 8px; border: none; cursor: pointer; font-size: 12px; font-weight: 600;
+  background: transparent; color: rgba(255,255,255,0.4); transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+}
+.chat-tabs button.active { color: #4fc3f7; border-bottom-color: #4fc3f7; }
+#chatPrivateBar {
+  display: none; padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.03);
+}
+#chatPrivateBar select {
+  width: 100%; padding: 5px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(0,0,0,0.5); color: #fff; font-size: 12px; outline: none;
+}
+#chatMessages {
+  flex: 1; overflow-y: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 4px;
+}
+#chatMessages::-webkit-scrollbar { width: 4px; }
+#chatMessages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+.chat-msg { color: rgba(255,255,255,0.85); line-height: 1.4; word-break: break-all; }
+.chat-msg .sender { font-weight: 600; }
+.chat-msg .sender.self { color: #4fc3f7; }
+.chat-msg .sender.other { color: #ffd54f; }
+.chat-msg .time { color: rgba(255,255,255,0.3); font-size: 10px; margin-left: 6px; }
+.chat-msg.system { color: rgba(255,255,255,0.4); font-style: italic; font-size: 12px; }
+#chatInputArea {
+  display: flex; gap: 6px; padding: 8px 10px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+#chatInput {
+  flex: 1; padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06); color: #fff; font-size: 13px; outline: none;
+}
+#chatInput:focus { border-color: #4fc3f7; }
+#chatSendBtn {
+  padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer;
+  background: #4fc3f7; color: #000; font-weight: 600; font-size: 12px; white-space: nowrap;
+}
+#chatSendBtn:hover { background: #29b6f6; }
+
+/* 好友窗口 */
+#friendPanel {
+  position: fixed; bottom: 12px; left: 12px; width: 280px; z-index: 60;
+  display: flex; flex-direction: column; font-size: 13px;
+}
+#friendPanel.collapsed #friendBody { display: none; }
+#friendPanel.collapsed #friendToggle { border-radius: 10px; }
+#friendToggle {
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+  padding: 8px 14px; border-radius: 10px 10px 0 0; cursor: pointer;
+  color: #fff; font-weight: 600; font-size: 13px; user-select: none;
+  border: 1px solid rgba(255,255,255,0.08); border-bottom: none;
+}
+#friendToggle .badge { background: #ffd54f; color: #000; border-radius: 10px; padding: 1px 7px; font-size: 11px; margin-left: 6px; display: none; }
+#friendBody {
+  background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.08); border-top: none;
+  border-radius: 0 0 10px 10px; display: flex; flex-direction: column; height: 400px;
+}
+.friend-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.friend-tabs button {
+  flex: 1; padding: 8px; border: none; cursor: pointer; font-size: 12px; font-weight: 600;
+  background: transparent; color: rgba(255,255,255,0.4); transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+}
+.friend-tabs button.active { color: #ffd54f; border-bottom-color: #ffd54f; }
+#friendSearchArea { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+#friendSearchInput {
+  width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06); color: #fff; font-size: 12px; outline: none;
+}
+#friendSearchInput:focus { border-color: #ffd54f; }
+#friendList {
+  flex: 1; overflow-y: auto; padding: 6px 0;
+}
+#friendList::-webkit-scrollbar { width: 4px; }
+#friendList::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+.friend-item {
+  display: flex; align-items: center; padding: 8px 12px; gap: 8px;
+  transition: background 0.15s; cursor: default;
+}
+.friend-item:hover { background: rgba(255,255,255,0.04); }
+.friend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.friend-dot.online { background: #66bb6a; box-shadow: 0 0 4px #66bb6a; }
+.friend-dot.offline { background: #666; }
+.friend-nick { flex: 1; color: rgba(255,255,255,0.85); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.friend-actions { display: flex; gap: 4px; }
+.friend-actions button {
+  padding: 3px 8px; border: none; border-radius: 4px; cursor: pointer;
+  font-size: 11px; font-weight: 600; transition: opacity 0.2s;
+}
+.friend-actions button:hover { opacity: 0.8; }
+.btn-msg { background: #4fc3f7; color: #000; }
+.btn-accept { background: #66bb6a; color: #000; }
+.btn-reject { background: #ef5350; color: #fff; }
+.btn-remove { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); }
+.btn-add { background: #ffd54f; color: #000; }
+.search-result { padding: 8px 12px; display: flex; align-items: center; gap: 8px; }
+.search-result .nick { flex: 1; color: #fff; font-size: 13px; }
+
+/* 好友申请通知 */
+#friendNotifPopup {
+  position: fixed; top: 20px; right: 20px; z-index: 300;
+  display: none; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto;
+}
+#friendNotifPopup.show { display: flex; }
+.friend-notif-card {
+  background: rgba(20,20,30,0.95); border: 1px solid rgba(255,213,79,0.3);
+  border-radius: 10px; padding: 12px 16px; width: 260px;
+  backdrop-filter: blur(8px); animation: slideIn 0.3s ease-out;
+}
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.friend-notif-card .notif-title { color: #ffd54f; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.friend-notif-card .notif-nick { color: #fff; font-size: 14px; font-weight: 700; }
+.friend-notif-card .notif-msg { color: rgba(255,255,255,0.5); font-size: 12px; margin: 4px 0 8px; }
+.friend-notif-card .notif-btns { display: flex; gap: 8px; }
+.friend-notif-card .notif-btns button {
+  flex: 1; padding: 6px; border: none; border-radius: 6px; cursor: pointer;
+  font-size: 12px; font-weight: 600;
+}
+
+/* 连接状态指示 */
+#connStatus {
+  position: fixed; top: 64px; right: 12px; z-index: 55;
+  padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+  background: rgba(0,0,0,0.6); color: #666; display: none;
+}
+#connStatus.connected { color: #66bb6a; display: block; }
+#connStatus.disconnected { color: #ef5350; display: block; }
+
+/* ===== 右上角音乐开关按钮 ===== */
+#musicBtn {
+  position: fixed; top: 12px; right: 12px; z-index: 60;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #fff; font-size: 20px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s, transform 0.15s, opacity 0.2s;
+  pointer-events: auto;
+}
+#musicBtn:hover { background: rgba(0,0,0,0.8); transform: scale(1.08); }
+#musicBtn:active { transform: scale(0.95); }
+#musicBtn.muted { opacity: 0.45; }
+#musicBtn .wave {
+  position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; color: #4fc3f7; white-space: nowrap;
+  display: none;
+}
+#musicBtn:not(.muted) .wave { display: block; }
+</style>
+</head>
+<body>
+<div id="ui">
+  <div id="scoreboard">
+    <span class="team1">🔵 P1 <span class="score" id="s1">0</span> <span id="k1" style="font-size:12px;color:#aaa">0</span>杀</span>
+    <span class="vs">VS</span>
+    <span class="team2"><span id="k2" style="font-size:12px;color:#aaa">0</span>杀 <span class="score" id="s2">0</span> P2 🔴</span>
+  </div>
+</div>
+<div id="goalMsg">GOAL!</div>
+<div id="powerupMsg"></div>
+<div id="buffLeft"><div class="buff-label" style="color:#4fc3f7">P1</div></div>
+<div id="buffRight"><div class="buff-label" style="color:#ef5350">P2</div></div>
+<div id="respawnBar"></div>
+<div id="startMsg">按任意键开始</div>
+<div id="victoryOverlay"><div id="victoryText"></div><div id="victorySub"></div><div id="victoryRestart">按 P 重新开始</div></div>
+<div id="controls">
+  <div class="ctrl"><b style="color:#4fc3f7">P1</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>爬行 <kbd>J</kbd>左腿 <kbd>K</kbd>右腿 <kbd>Space</kbd>使用道具 <kbd>E</kbd>冲锋枪 <kbd>Q</kbd>狙击枪 <kbd>R</kbd>手雷</div>
+  <div class="ctrl"><b style="color:#ef5350">P2</b> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>爬行 <kbd>1</kbd>左腿 <kbd>2</kbd>右腿 <kbd>/</kbd>使用道具 <kbd>.</kbd>冲锋枪 <kbd>,</kbd>狙击枪 <kbd>0</kbd>手雷</div>
+</div>
+<div id="multiplayerPanel">
+  <h2>躺平足球3D 联机版</h2>
+  <div class="mode-btns">
+    <button id="btnLocal">单人/本地双人</button>
+    <button id="btnCreate">创建房间</button>
+    <button id="btnJoin">加入房间</button>
+  </div>
+  <input id="roomInput" type="text" placeholder="输入房间号" maxlength="10" />
+  <button id="btnConfirm">确认</button>
+  <button id="btnServerCfg" title="配置服务器地址" style="background:#666;color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:14px">⚙️</button>
+  <div id="serverCfgPanel" style="display:none;margin-top:8px">
+    <input id="serverUrlInput" type="text" placeholder="服务器地址 (如 https://xxx.onrender.com)" style="width:100%;padding:6px;border-radius:6px;border:1px solid #555;background:#333;color:#fff;font-size:12px" />
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <button id="btnSaveServer" style="flex:1;padding:6px;border:none;border-radius:6px;background:#4fc3f7;color:#000;font-weight:bold;cursor:pointer">保存并刷新</button>
+      <button id="btnResetServer" style="padding:6px;border:none;border-radius:6px;background:#555;color:#ccc;cursor:pointer">重置</button>
+    </div>
+  </div>
+  <div id="roomStatus"></div>
+</div>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+// ===== 常量 =====
+const BALL_R = 0.4;
+const PLAYER_R = 0.7, PLAYER_H = 0.4;
+const LEG_LEN = 0.9;
+const GRAVITY = -15;
+const MOVE_SPEED = 28;
+const KICK_FORCE = 25;
+const BALL_FRIC = 0.992;
+const BALL_GROUND_FRIC = 0.982;
+const PLAYER_FRIC = 0.93;
+const KNOCKBACK = 18;
+const MAGNUS_FACTOR = 0.15;
+const WRIGGLE_SPEED = 10;
+const RESPAWN_TIME = 5;
+const INVINCIBLE_TIME = 3;
+const MAX_HP = 100;
+const BOUNCE_MAX = 1023;
+const WIN_SCORE = 11;
+const GOAL_W = 7.32, GOAL_H = 2.44, GOAL_D = 1.5;
+
+// 伤害值
+const DMG_GUN = 3;
+const DMG_SNIPER = 80;
+const DMG_ROCKET = 100;
+const DMG_GRENADE = 200;
+const DMG_BOMB = 100;
+const DMG_ZAP = 100;
+const DMG_NUKE = 999;
+
+// ===== 随机封闭场地 =====
+let NUM_SIDES = 7 + Math.floor(Math.random() * 5); // 7-11边
+const BASE_RADIUS = 26;
+const fieldVerts = []; // {x, z}
+const fieldEdges = []; // {ax,az,bx,bz,nx,nz,dx,dz,len,lenSq,isGoal,goalTeam,goalT1,goalT2}
+const goalSegments = []; // {edgeIdx, t1, t2, team, cx, cz, onx, onz} — 独立球门段
+
+function generateField() {
+  const angles = [];
+  for (let i = 0; i < NUM_SIDES; i++) angles.push((i / NUM_SIDES) * Math.PI * 2 + (Math.random() - 0.5) * 0.3);
+  angles.sort((a, b) => a - b);
+  for (let i = 0; i < NUM_SIDES; i++) {
+    const r = BASE_RADIUS * (0.75 + Math.random() * 0.5);
+    fieldVerts.push({ x: Math.cos(angles[i]) * r, z: Math.sin(angles[i]) * r });
+  }
+  // 计算面积并缩放到目标
+  let area = 0;
+  for (let i = 0; i < NUM_SIDES; i++) {
+    const j = (i + 1) % NUM_SIDES;
+    area += fieldVerts[i].x * fieldVerts[j].z - fieldVerts[j].x * fieldVerts[i].z;
+  }
+  area = Math.abs(area) / 2;
+  const targetArea = 1620;
+  const scale = Math.sqrt(targetArea / area);
+  for (const v of fieldVerts) { v.x *= scale; v.z *= scale; }
+}
+
+function computeEdges() {
+  fieldEdges.length = 0; goalSegments.length = 0;
+  for (let i = 0; i < NUM_SIDES; i++) {
+    const j = (i + 1) % NUM_SIDES;
+    const a = fieldVerts[i], b = fieldVerts[j];
+    const dx = b.x - a.x, dz = b.z - a.z;
+    const len = Math.sqrt(dx * dx + dz * dz);
+    const nx = -dz / len, nz = dx / len;
+    fieldEdges.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, nx, nz, dx: dx / len, dz: dz / len, len, lenSq: len * len, isGoal: false, goalTeam: 0, goalT1: 0, goalT2: 0 });
+  }
+  // 找两条最相对的边放球门
+  const edgeAngles = fieldEdges.map((e, i) => ({
+    idx: i,
+    angle: Math.atan2(e.dz, e.dx),
+    cx: (e.ax + e.bx) / 2,
+    cz: (e.az + e.bz) / 2,
+    len: e.len
+  }));
+  let bestPair = [0, 0], bestScore = -1;
+  for (let i = 0; i < edgeAngles.length; i++) {
+    for (let j = i + 1; j < edgeAngles.length; j++) {
+      const a1 = edgeAngles[i].angle, a2 = edgeAngles[j].angle;
+      let diff = Math.abs(a1 - a2);
+      if (diff > Math.PI) diff = Math.PI * 2 - diff;
+      const opp = 1 - diff / Math.PI;
+      const dist = Math.sqrt((edgeAngles[i].cx - edgeAngles[j].cx) ** 2 + (edgeAngles[i].cz - edgeAngles[j].cz) ** 2);
+      const score = opp * 0.7 + (dist / 60) * 0.3;
+      if (score > bestScore) { bestScore = score; bestPair = [i, j]; }
+    }
+  }
+  const GOAL_W_ABS = GOAL_W;
+  for (let gi = 0; gi < 2; gi++) {
+    const edgeIdx = bestPair[gi];
+    const edge = fieldEdges[edgeIdx];
+    const halfW = (GOAL_W_ABS / 2) / edge.len;
+    const t1 = Math.max(0.05, 0.5 - halfW), t2 = Math.min(0.95, 0.5 + halfW);
+    if (t2 - t1 < 0.04) continue;
+    const team = gi + 1;
+    const cx = edge.ax + edge.dx * edge.len * ((t1 + t2) / 2);
+    const cz = edge.az + edge.dz * edge.len * ((t1 + t2) / 2);
+    const onx = -edge.nx, onz = -edge.nz;
+    goalSegments.push({ edgeIdx, t1, t2, team, cx, cz, onx, onz });
+    edge.isGoal = true;
+  }
+}
+
+let FIELD_W = BASE_RADIUS, FIELD_H = BASE_RADIUS;
+function updateFieldBounds() {
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const v of fieldVerts) {
+    minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x);
+    minZ = Math.min(minZ, v.z); maxZ = Math.max(maxZ, v.z);
+  }
+  FIELD_W = (maxX - minX) / 2;
+  FIELD_H = (maxZ - minZ) / 2;
+}
+
+function isInsidePolygon(x, z) {
+  for (const e of fieldEdges) {
+    if ((x - e.ax) * e.nx + (z - e.az) * e.nz < 0) return false;
+  }
+  return true;
+}
+
+function signedDistToEdge(x, z, e) {
+  return (x - e.ax) * e.nx + (z - e.az) * e.nz;
+}
+
+function projectOnEdge(x, z, e) {
+  return ((x - e.ax) * e.dx + (z - e.az) * e.dz) / e.len;
+}
+
+function constrainToField(x, z, radius) {
+  for (let iter = 0; iter < 3; iter++) {
+    for (const e of fieldEdges) {
+      const sd = signedDistToEdge(x, z, e);
+      if (sd < radius) {
+        x += e.nx * (radius - sd);
+        z += e.nz * (radius - sd);
+      }
+    }
+  }
+  return { x, z };
+}
+
+generateField();
+computeEdges();
+updateFieldBounds();
+
+// ===== 渲染器 =====
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a3d1a);
+scene.fog = new THREE.Fog(scene.background, 50, 120);
+
+const fieldGroup = new THREE.Group();
+scene.add(fieldGroup);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 150);
+camera.position.set(0, 35, 35);
+camera.lookAt(0, 0, 0);
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ===== 灯光 =====
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const dir = new THREE.DirectionalLight(0xfff5e0, 1.2);
+dir.position.set(0, 40, 20);
+dir.castShadow = true;
+dir.shadow.mapSize.set(2048, 2048);
+dir.shadow.camera.left = -60; dir.shadow.camera.right = 60;
+dir.shadow.camera.top = 40; dir.shadow.camera.bottom = -40;
+scene.add(dir);
+
+// ===== 场地网格 =====
+const fieldShape = new THREE.Shape();
+fieldShape.moveTo(fieldVerts[0].x, fieldVerts[0].z);
+for (let i = 1; i < NUM_SIDES; i++) fieldShape.lineTo(fieldVerts[i].x, fieldVerts[i].z);
+fieldShape.closePath();
+const fieldGeo = new THREE.ShapeGeometry(fieldShape);
+const fieldMat = new THREE.MeshStandardMaterial({ color: 0x2d7a2d, roughness: 0.9 });
+const fieldMesh = new THREE.Mesh(fieldGeo, fieldMat);
+fieldMesh.rotation.x = -Math.PI / 2; fieldMesh.receiveShadow = true; fieldGroup.add(fieldMesh);
+
+// 草地条纹
+const stripeCount = Math.min(10, NUM_SIDES);
+for (let i = 0; i < stripeCount; i++) {
+  const a = fieldVerts[i], b = fieldVerts[(i + 1) % NUM_SIDES];
+  const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+  const stripe = new THREE.Mesh(
+    new THREE.PlaneGeometry(BASE_RADIUS * 0.4, BASE_RADIUS * 0.4),
+    new THREE.MeshStandardMaterial({ color: i % 2 === 0 ? 0x257025 : 0x2d7a2d, roughness: 0.9 })
+  );
+  stripe.rotation.x = -Math.PI / 2;
+  stripe.position.set(mx, 0.01, mz);
+  stripe.receiveShadow = true;
+  fieldGroup.add(stripe);
+}
+
+// 场地边界白线
+const lineMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+for (let i = 0; i < NUM_SIDES; i++) {
+  const a = fieldVerts[i], b = fieldVerts[(i + 1) % NUM_SIDES];
+  const dx = b.x - a.x, dz = b.z - a.z;
+  const len = Math.sqrt(dx * dx + dz * dz);
+  const line = new THREE.Mesh(new THREE.BoxGeometry(len, 0.02, 0.12), lineMat);
+  line.position.set((a.x + b.x) / 2, 0.05, (a.z + b.z) / 2);
+  line.rotation.y = -Math.atan2(dz, dx);
+  fieldGroup.add(line);
+}
+
+// ===== 球门（简洁外观：立柱+横梁+干净半透明网）=====
+function makePolygonGoal(gs) {
+  const edge = fieldEdges[gs.edgeIdx];
+  const g = new THREE.Group();
+  const teamColor = gs.team === 1 ? 0x4fc3f7 : 0xef5350;
+  const postMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.6, roughness: 0.3 });
+  const netMat = new THREE.MeshStandardMaterial({ color: teamColor, transparent: true, opacity: 0.12, side: THREE.DoubleSide, roughness: 0.9 });
+  const t1 = gs.t1 * edge.len, t2 = gs.t2 * edge.len;
+  const goalLen = t2 - t1;
+  const gx1 = edge.ax + edge.dx * t1, gz1 = edge.az + edge.dz * t1;
+  const gx2 = edge.ax + edge.dx * t2, gz2 = edge.az + edge.dz * t2;
+  const onx = gs.onx, onz = gs.onz;
+  const postR = 0.12;
+
+  const barCx = (gx1 + gx2) / 2, barCz = (gz1 + gz2) / 2;
+  const barAngle = Math.atan2(gz2 - gz1, gx2 - gx1);
+  const backLeftX = gx1 + onx * GOAL_D, backLeftZ = gz1 + onz * GOAL_D;
+  const backRightX = gx2 + onx * GOAL_D, backRightZ = gz2 + onz * GOAL_D;
+  const backBarCx = barCx + onx * GOAL_D, backBarCz = barCz + onz * GOAL_D;
+
+  // 前左立柱
+  const leftPost = new THREE.Mesh(new THREE.CylinderGeometry(postR, postR, GOAL_H, 8), postMat);
+  leftPost.position.set(gx1, GOAL_H / 2, gz1); leftPost.castShadow = true; g.add(leftPost);
+  // 前右立柱
+  const rightPost = new THREE.Mesh(new THREE.CylinderGeometry(postR, postR, GOAL_H, 8), postMat);
+  rightPost.position.set(gx2, GOAL_H / 2, gz2); rightPost.castShadow = true; g.add(rightPost);
+  // 前横梁
+  const crossbar = new THREE.Mesh(new THREE.CylinderGeometry(postR, postR, goalLen, 8), postMat);
+  crossbar.rotation.z = Math.PI / 2;
+  crossbar.rotation.y = -barAngle + Math.PI / 2;
+  crossbar.position.set(barCx, GOAL_H, barCz); crossbar.castShadow = true; g.add(crossbar);
+
+  // 后左立柱
+  const blPost = new THREE.Mesh(new THREE.CylinderGeometry(postR * 0.6, postR * 0.6, GOAL_H, 8), postMat);
+  blPost.position.set(backLeftX, GOAL_H / 2, backLeftZ); g.add(blPost);
+  // 后右立柱
+  const brPost = new THREE.Mesh(new THREE.CylinderGeometry(postR * 0.6, postR * 0.6, GOAL_H, 8), postMat);
+  brPost.position.set(backRightX, GOAL_H / 2, backRightZ); g.add(brPost);
+  // 后横梁
+  const backBar = new THREE.Mesh(new THREE.CylinderGeometry(postR * 0.6, postR * 0.6, goalLen, 8), postMat);
+  backBar.rotation.z = Math.PI / 2;
+  backBar.rotation.y = -barAngle + Math.PI / 2;
+  backBar.position.set(backBarCx, GOAL_H, backBarCz); g.add(backBar);
+
+  // 顶部连接梁（前后横梁连线）
+  function addBar(p1, p2, r) {
+    const len = p1.distanceTo(p2);
+    const bar = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 8), postMat);
+    bar.position.copy(p1.clone().add(p2).multiplyScalar(0.5));
+    bar.lookAt(p2); bar.rotateX(Math.PI / 2);
+    g.add(bar);
+  }
+  addBar(new THREE.Vector3(gx1, GOAL_H, gz1), new THREE.Vector3(backLeftX, GOAL_H, backLeftZ), postR * 0.4);
+  addBar(new THREE.Vector3(gx2, GOAL_H, gz2), new THREE.Vector3(backRightX, GOAL_H, backRightZ), postR * 0.4);
+
+  // 后网（干净半透明，不要线框）
+  const backNet = new THREE.Mesh(new THREE.PlaneGeometry(goalLen, GOAL_H), netMat);
+  backNet.position.set(backBarCx, GOAL_H / 2, backBarCz);
+  backNet.rotation.y = Math.atan2(onz, onx); g.add(backNet);
+
+  // 顶网
+  const topNet = new THREE.Mesh(new THREE.PlaneGeometry(goalLen, GOAL_D), netMat);
+  topNet.rotation.set(-Math.PI / 2, -barAngle + Math.PI / 2, 0);
+  topNet.position.set(barCx + onx * GOAL_D / 2, GOAL_H, barCz + onz * GOAL_D / 2);
+  g.add(topNet);
+
+  // 左侧网
+  const leftNet = new THREE.Mesh(new THREE.PlaneGeometry(GOAL_D, GOAL_H), netMat);
+  leftNet.position.set((gx1 + backLeftX) / 2, GOAL_H / 2, (gz1 + backLeftZ) / 2);
+  leftNet.rotation.y = Math.atan2(onz, onx) + Math.PI / 2;
+  g.add(leftNet);
+
+  // 右侧网
+  const rightNet = new THREE.Mesh(new THREE.PlaneGeometry(GOAL_D, GOAL_H), netMat);
+  rightNet.position.set((gx2 + backRightX) / 2, GOAL_H / 2, (gz2 + backRightZ) / 2);
+  rightNet.rotation.y = Math.atan2(onz, onx) - Math.PI / 2;
+  g.add(rightNet);
+
+  // 地面标记
+  const floorMark = new THREE.Mesh(new THREE.PlaneGeometry(goalLen, GOAL_D),
+    new THREE.MeshBasicMaterial({ color: teamColor, transparent: true, opacity: 0.06, side: THREE.DoubleSide }));
+  floorMark.rotation.x = -Math.PI / 2;
+  floorMark.rotation.z = -barAngle + Math.PI / 2;
+  floorMark.position.set(barCx + onx * GOAL_D / 2, 0.02, barCz + onz * GOAL_D / 2);
+  g.add(floorMark);
+  fieldGroup.add(g);
+}
+for (const gs of goalSegments) makePolygonGoal(gs);
+console.log(`球门数量: ${goalSegments.length}`);
+
+function buildFieldVisuals() {
+  while (fieldGroup.children.length) {
+    const c = fieldGroup.children[0];
+    fieldGroup.remove(c);
+    c.traverse?.(o => { if (o.geometry) o.geometry.dispose?.(); if (o.material) { if (Array.isArray(o.material)) o.material.forEach(m => m.dispose?.()); else o.material.dispose?.(); } });
+  }
+  const shape = new THREE.Shape();
+  shape.moveTo(fieldVerts[0].x, fieldVerts[0].z);
+  for (let i = 1; i < NUM_SIDES; i++) shape.lineTo(fieldVerts[i].x, fieldVerts[i].z);
+  shape.closePath();
+  const fMesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshStandardMaterial({ color: 0x2d7a2d, roughness: 0.9 }));
+  fMesh.rotation.x = -Math.PI / 2; fMesh.receiveShadow = true; fieldGroup.add(fMesh);
+  for (let i = 0; i < stripeCount; i++) {
+    const a = fieldVerts[i], b = fieldVerts[(i + 1) % NUM_SIDES];
+    const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+    const stripe = new THREE.Mesh(
+      new THREE.PlaneGeometry(BASE_RADIUS * 0.4, BASE_RADIUS * 0.4),
+      new THREE.MeshStandardMaterial({ color: i % 2 === 0 ? 0x257025 : 0x2d7a2d, roughness: 0.9 }));
+    stripe.rotation.x = -Math.PI / 2; stripe.position.set(mx, 0.01, mz); stripe.receiveShadow = true;
+    fieldGroup.add(stripe);
+  }
+  for (let i = 0; i < NUM_SIDES; i++) {
+    const a = fieldVerts[i], b = fieldVerts[(i + 1) % NUM_SIDES];
+    const dx = b.x - a.x, dz = b.z - a.z;
+    const len = Math.sqrt(dx * dx + dz * dz);
+    const line = new THREE.Mesh(new THREE.BoxGeometry(len, 0.02, 0.12), lineMat);
+    line.position.set((a.x + b.x) / 2, 0.05, (a.z + b.z) / 2);
+    line.rotation.y = -Math.atan2(dz, dx);
+    fieldGroup.add(line);
+  }
+  for (const gs of goalSegments) makePolygonGoal(gs);
+}
+
+function applyFieldData(data) {
+  NUM_SIDES = data.numSides;
+  fieldVerts.length = 0;
+  for (const v of data.verts) fieldVerts.push({ x: v.x, z: v.z });
+  fieldEdges.length = 0;
+  for (let i = 0; i < NUM_SIDES; i++) {
+    const j = (i + 1) % NUM_SIDES;
+    const a = fieldVerts[i], b = fieldVerts[j];
+    const dx = b.x - a.x, dz = b.z - a.z;
+    const len = Math.sqrt(dx * dx + dz * dz);
+    const nx = -dz / len, nz = dx / len;
+    fieldEdges.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z, nx, nz, dx: dx / len, dz: dz / len, len, lenSq: len * len, isGoal: false, goalTeam: 0, goalT1: 0, goalT2: 0 });
+  }
+  goalSegments.length = 0;
+  for (const gs of data.goals) {
+    goalSegments.push(gs);
+    fieldEdges[gs.edgeIdx].isGoal = true;
+  }
+  updateFieldBounds();
+  buildFieldVisuals();
+  while (balls.length) { const b = balls.pop(); scene.remove(b.mesh); }
+  const radius = BALL_R; const skin = data.mainBallSkin || 'football';
+  const mesh = createBallMesh(radius, skin);
+  const state = createBallState();
+  balls.push({ mesh, state, isMain: true, _radius: radius, _skin: skin });
+  // 按新球门位置重定位玩家
+  const gs1c = goalSegments.find(g => g.team === 1);
+  const gs2c = goalSegments.find(g => g.team === 2);
+  const p1x = gs2c ? -gs2c.cx * 0.3 : -6;
+  const p1z = gs2c ? -gs2c.cz * 0.3 : 0;
+  const p2x = gs1c ? -gs1c.cx * 0.3 : 6;
+  const p2z = gs1c ? -gs1c.cz * 0.3 : 0;
+  for (const pp of [p1, p2, ai1, ai2]) {
+    const isT1 = pp.team === 1;
+    pp.x = isT1 ? p1x : p2x;
+    pp.z = (isT1 ? p1z : p2z) + (pp === ai1 ? 3 : pp === ai2 ? -3 : 0);
+    pp.vx = 0; pp.vz = 0; pp.knockVx = 0; pp.knockVz = 0;
+    pp.hp = MAX_HP; pp.dead = false; pp.invincible = 2; pp.respawnTimer = 0;
+    pp.heldPowerup = null; pp.gunAmmo = 0; pp.sniperAmmo = 0; pp.grenadeAmmo = 0;
+    pp.buffs = { speed: 0, bigKick: 0, magnet: 0, shield: 0, frozen: 0, giant: 0, small: 0 };
+    if (pp.mesh?.group) { pp.mesh.group.position.set(pp.x, pp.y || 0, pp.z); pp.mesh.group.visible = true; }
+  }
+  clientFieldReady = true;
+}
+
+// ===== 多球系统 =====
+const balls = [];
+const MAX_BALLS = 40;
+const CENTER_CIRCLE_R = 9.15;
+
+// 球皮肤类型
+const BALL_SKINS = ['football', 'basketball', 'tennis', 'volleyball', 'badminton'];
+
+function createBallMesh(radius, skinType) {
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(radius, 20, 20), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4, metalness: 0.1 }));
+  ball.castShadow = true; ball.position.y = radius + 0.05;
+
+  if (skinType === 'football') {
+    // 足球花纹 - 12个黑色五边形
+    const pentGeo = new THREE.CircleGeometry(radius * 0.22, 5);
+    const pentMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+    const golden = (1 + Math.sqrt(5)) / 2;
+    for (let i = 0; i < 12; i++) {
+      const theta = Math.acos(1 - 2 * (i + 0.5) / 12);
+      const phi = 2 * Math.PI * i / golden;
+      const p = new THREE.Mesh(pentGeo, pentMat);
+      p.position.setFromSphericalCoords(radius * 1.002, theta, phi);
+      p.lookAt(0, 0, 0);
+      ball.add(p);
+    }
+    // 黑色线条
+    const lineGeo = new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(radius * 0.99, 1));
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x333333 });
+    ball.add(new THREE.LineSegments(lineGeo, lineMat));
+  } else if (skinType === 'basketball') {
+    // 篮球 - 橙色底+黑色线
+    ball.material.color.setHex(0xff8c00);
+    ball.material.roughness = 0.7;
+    // 横线
+    const hLine = new THREE.Mesh(new THREE.TorusGeometry(radius * 1.001, radius * 0.02, 4, 32), new THREE.MeshBasicMaterial({ color: 0x222222 }));
+    ball.add(hLine);
+    // 竖线
+    const vLine = new THREE.Mesh(new THREE.TorusGeometry(radius * 1.001, radius * 0.02, 4, 32), new THREE.MeshBasicMaterial({ color: 0x222222 }));
+    vLine.rotation.y = Math.PI / 2; ball.add(vLine);
+    // 侧弯线
+    const sLine = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.7, radius * 0.02, 4, 32), new THREE.MeshBasicMaterial({ color: 0x222222 }));
+    sLine.position.z = radius * 0.7; ball.add(sLine);
+    const sLine2 = sLine.clone(); sLine2.position.z = -radius * 0.7; ball.add(sLine2);
+  } else if (skinType === 'tennis') {
+    // 网球 - 荧光绿+白色弯线
+    ball.material.color.setHex(0xc8e620);
+    ball.material.roughness = 0.6;
+    const curve1 = new THREE.Mesh(new THREE.TorusGeometry(radius * 1.001, radius * 0.025, 4, 32), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    curve1.rotation.x = 0.3; ball.add(curve1);
+    const curve2 = new THREE.Mesh(new THREE.TorusGeometry(radius * 1.001, radius * 0.025, 4, 32), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    curve2.rotation.x = -0.3; curve2.rotation.z = Math.PI / 2; ball.add(curve2);
+  } else if (skinType === 'volleyball') {
+    // 排球 - 白色底+蓝黄红线条
+    ball.material.color.setHex(0xf5f5f5);
+    const vColors = [0x1565c0, 0xffc107, 0xe53935];
+    for (let vi = 0; vi < 3; vi++) {
+      const vLine = new THREE.Mesh(new THREE.TorusGeometry(radius * 1.001, radius * 0.025, 4, 32), new THREE.MeshBasicMaterial({ color: vColors[vi] }));
+      vLine.rotation.set(vi * 0.5, vi * 0.7, vi * 0.3);
+      ball.add(vLine);
+    }
+  } else if (skinType === 'badminton') {
+    // 羽毛球 - 白色底+V形线条(模拟羽毛)
+    ball.material.color.setHex(0xf8f8f0);
+    ball.material.roughness = 0.3;
+    // 顶部圆环
+    const topRing = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.5, radius * 0.03, 4, 16), new THREE.MeshBasicMaterial({ color: 0xdddddd }));
+    topRing.position.y = radius * 0.6; topRing.rotation.x = Math.PI / 2; ball.add(topRing);
+    // 放射线
+    for (let bi = 0; bi < 8; bi++) {
+      const a = (bi / 8) * Math.PI * 2;
+      const spoke = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.01, radius * 0.01, radius * 1.2, 4), new THREE.MeshBasicMaterial({ color: 0xcccccc }));
+      spoke.position.set(Math.cos(a) * radius * 0.3, 0, Math.sin(a) * radius * 0.3);
+      spoke.rotation.set(0.3, a, Math.PI / 2); ball.add(spoke);
+    }
+  }
+
+  scene.add(ball);
+  return ball;
+}
+
+function createBallState() {
+  return { vx: 0, vy: 0, vz: 0, spinX: 0, spinY: 0, spinZ: 0, stuckTimer: 0, lastX: 0, lastZ: 0, lastTouch: null };
+}
+
+function randomBallRadius() {
+  return 0.2 + Math.random() * 0.5; // 0.2 ~ 0.7
+}
+function randomBallSkin() {
+  return BALL_SKINS[Math.floor(Math.random() * BALL_SKINS.length)];
+}
+
+function initMainBall() {
+  const radius = BALL_R;
+  const skin = randomBallSkin();
+  const mesh = createBallMesh(radius, skin);
+  const state = createBallState();
+  balls.push({ mesh, state, isMain: true, _radius: radius, _skin: skin });
+}
+initMainBall();
+
+function spawnExtraBall() {
+  if (balls.length >= MAX_BALLS) return;
+  const radius = randomBallRadius();
+  const skin = randomBallSkin();
+  const mesh = createBallMesh(radius, skin);
+  const angle = Math.random() * Math.PI * 2;
+  const r = Math.random() * (CENTER_CIRCLE_R * 0.5);
+  mesh.position.set(Math.cos(angle) * r, radius + 0.05, Math.sin(angle) * r);
+  const state = createBallState();
+  state.vx = (Math.random() - 0.5) * 10; state.vz = (Math.random() - 0.5) * 10;
+  balls.push({ mesh, state, isMain: false, _radius: radius, _skin: skin });
+  showPowerupMsg('⚽ 多球!', 0xffffff);
+}
+
+function resetBall(ball) {
+  // 回到中心圆圈内的随机位置
+  const angle = Math.random() * Math.PI * 2;
+  const r = Math.random() * (CENTER_CIRCLE_R * 0.6);
+  ball.mesh.position.set(Math.cos(angle) * r, ball._radius + 0.05, Math.sin(angle) * r);
+  Object.assign(ball.state, { vx: 0, vy: 0, vz: 0, spinX: 0, spinY: 0, spinZ: 0, stuckTimer: 0, lastX: 0, lastZ: 0, lastTouch: null });
+}
+
+// ===== 粒子 =====
+const explosionParticles = [];
+function createExplosion(x, z, count = 20, c1 = 0xff6600, c2 = 0xffcc00) {
+  for (let i = 0; i < count; i++) {
+    const p = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 6), new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? c1 : c2 }));
+    p.position.set(x, 0.5, z); scene.add(p);
+    const a = Math.random() * Math.PI * 2, s = 3 + Math.random() * 5;
+    explosionParticles.push({ mesh: p, vx: Math.cos(a) * s, vy: 3 + Math.random() * 5, vz: Math.sin(a) * s, life: 0.8 + Math.random() * 0.4 });
+  }
+}
+function updateExplosions(dt) {
+  for (let i = explosionParticles.length - 1; i >= 0; i--) {
+    const p = explosionParticles[i]; p.life -= dt;
+    if (p.life <= 0) { scene.remove(p.mesh); explosionParticles.splice(i, 1); continue; }
+    p.vy -= 15 * dt; p.mesh.position.x += p.vx * dt; p.mesh.position.y += p.vy * dt; p.mesh.position.z += p.vz * dt;
+    p.mesh.scale.setScalar(p.life);
+  }
+}
+
+// ===== 视觉效果 =====
+const freezeVisuals = [], shieldVisuals = [];
+function createFreezeEffect(player) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(PLAYER_R * 0.7, PLAYER_R * 0.7, 0.5, 12),
+    new THREE.MeshStandardMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.4, roughness: 0.1, metalness: 0.8 }));
+  m.position.y = 0.25; player.mesh.group.add(m); freezeVisuals.push({ mesh: m, player });
+}
+function removeFreezeEffect(player) {
+  const i = freezeVisuals.findIndex(f => f.player === player);
+  if (i >= 0) { player.mesh.group.remove(freezeVisuals[i].mesh); freezeVisuals.splice(i, 1); }
+}
+function createShieldEffect(player) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(PLAYER_R * 1.2, 16, 12),
+    new THREE.MeshStandardMaterial({ color: 0x4caf50, transparent: true, opacity: 0.25, roughness: 0.1, metalness: 0.3 }));
+  m.position.y = 0.2; player.mesh.group.add(m); shieldVisuals.push({ mesh: m, player });
+}
+function removeShieldEffect(player) {
+  const i = shieldVisuals.findIndex(s => s.player === player);
+  if (i >= 0) { player.mesh.group.remove(shieldVisuals[i].mesh); shieldVisuals.splice(i, 1); }
+}
+
+// ===== 道具系统 =====
+const POWERUP_TYPES = {
+  SPEED: { icon: '⚡', name: '加速', color: 0xffeb3b, duration: 6 },
+  FREEZE: { icon: '❄️', name: '冰冻', color: 0x00e5ff, duration: 3 },
+  BIG: { icon: '🦶', name: '大脚', color: 0xff6d00, duration: 5 },
+  BOMB: { icon: '💣', name: '炸弹', color: 0xf44336, duration: 0 },
+  MAGNET: { icon: '🧲', name: '磁铁', color: 0x9c27b0, duration: 5 },
+  SHIELD: { icon: '🛡️', name: '护盾', color: 0x4caf50, duration: 4 },
+  ROCKET: { icon: '🚀', name: '火箭弹', color: 0xff1744, duration: 0 },
+  ZAP: { icon: '⚡', name: '电击', color: 0x00e5ff, duration: 0 },
+  GUN: { icon: '🔫', name: '冲锋枪', color: 0x607d8b, duration: 0, ammo: 100 },
+  SNIPER: { icon: '🎯', name: '狙击枪', color: 0x263238, duration: 0, ammo: 5 },
+  GRENADE: { icon: '🎗️', name: '手雷', color: 0x795548, duration: 0 },
+  NUKE: { icon: '☢️', name: '核武器', color: 0xffeb3b, duration: 0 },
+  MULTIBALL: { icon: '⚽', name: '多球', color: 0xffffff, duration: 0 },
+  BOSS: { icon: '👹', name: '召唤Boss', color: 0xff0000, duration: 0 },
+};
+const WEAPON_TYPES = ['BOMB', 'ROCKET', 'ZAP', 'GUN', 'SNIPER', 'GRENADE', 'NUKE', 'MULTIBALL', 'BOSS'];
+const POWERUP_LIST = Object.keys(POWERUP_TYPES);
+
+// Boss召唤方块高概率权重
+const POWERUP_WEIGHTS = { SPEED:1, FREEZE:1, BIG:1, BOMB:1, MAGNET:1, SHIELD:1, ROCKET:1, ZAP:1, GUN:1, SNIPER:1, GRENADE:1, NUKE:0.5, MULTIBALL:1, BOSS:4 };
+const WEIGHTED_POWERUP_LIST = [];
+for (const k of POWERUP_LIST) { for (let i = 0; i < (POWERUP_WEIGHTS[k] || 1) * 10; i++) WEIGHTED_POWERUP_LIST.push(k); }
+
+const powerups = [];
+let powerupTimer = 2;
+function spawnPowerup() {
+  const typeKey = WEIGHTED_POWERUP_LIST[Math.floor(Math.random() * WEIGHTED_POWERUP_LIST.length)];
+  const type = POWERUP_TYPES[typeKey];
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5),
+    new THREE.MeshStandardMaterial({ color: type.color, emissive: type.color, emissiveIntensity: 0.5, roughness: 0.3 })));
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.06, 8, 24),
+    new THREE.MeshBasicMaterial({ color: type.color, transparent: true, opacity: 0.6 }));
+  ring.rotation.x = Math.PI / 2; g.add(ring);
+  // 在场地内随机位置
+  let px, pz;
+  do { px = (Math.random() - 0.5) * FIELD_W * 1.8; pz = (Math.random() - 0.5) * FIELD_H * 1.8; } while (!isInsidePolygon(px, pz));
+  g.position.set(px, 0.6, pz);
+  scene.add(g); powerups.push({ group: g, typeKey, type, ring, _id: nextNetId() });
+}
+function updatePowerups(dt) {
+  powerupTimer -= dt;
+  if (powerupTimer <= 0 && powerups.length < 5) { spawnPowerup(); powerupTimer = 3 + Math.random() * 4; }
+  for (const p of powerups) { p.group.rotation.y += dt * 2; p.ring.rotation.z += dt * 3; p.group.position.y = 0.6 + Math.sin(Date.now() * 0.003) * 0.15; }
+}
+function checkPowerupPickup(player) {
+  for (let i = powerups.length - 1; i >= 0; i--) {
+    const p = powerups[i];
+    if (Math.sqrt((player.x - p.group.position.x) ** 2 + (player.z - p.group.position.z) ** 2) < PLAYER_R + 0.5) {
+      const id = p._id;
+      if (WEAPON_TYPES.includes(p.typeKey)) activatePowerup(player, p.typeKey);
+      else { if (!player.heldPowerup) player.heldPowerup = p.typeKey; else activatePowerup(player, p.typeKey); }
+      scene.remove(p.group); powerups.splice(i, 1); sndPickup();
+      queueNetEvent('powerup_pickup', { id, by: allPlayers.indexOf(player) });
+    }
+  }
+}
+function activatePowerup(player, typeKey) {
+  const type = POWERUP_TYPES[typeKey]; showPowerupMsg(type.icon + ' ' + type.name + '!', type.color);
+  queueNetEvent('powerup_msg', { text: type.icon + ' ' + type.name + '!', color: type.color });
+  switch (typeKey) {
+    case 'SPEED': player.buffs.speed = type.duration; player.speedMultiplier = 2.0; break;
+    case 'FREEZE': for (const o of allPlayers) { if (o !== player) { o.buffs.frozen = type.duration; createFreezeEffect(o); } } break;
+    case 'BIG': player.buffs.bigKick = type.duration; break;
+    case 'BOMB': activateBomb(player, player.x, player.z); break;
+    case 'MAGNET': player.buffs.magnet = type.duration; break;
+    case 'SHIELD': player.buffs.shield = type.duration; createShieldEffect(player); break;
+    case 'ROCKET': activateRocket(player); break;
+    case 'ZAP': activateZap(player); break;
+    case 'GUN': player.gunAmmo += type.ammo; break;
+    case 'SNIPER': player.sniperAmmo += type.ammo; break;
+    case 'GRENADE': player.grenadeAmmo += 5; break;
+    case 'NUKE': activateNuke(player); break;
+    case 'MULTIBALL': spawnExtraBall(); break;
+    case 'BOSS': spawnBoss(player); break;
+  }
+  queueNetEvent('activate_powerup', { by: allPlayers.indexOf(player), type: typeKey });
+}
+
+// ===== 伤害系统 =====
+function damagePlayer(victim, dmg, attacker) {
+  if (victim.dead) return;
+  if (victim.invincible > 0) return;
+  if (victim.buffs.shield) { victim.buffs.shield = 0; removeShieldEffect(victim); return; }
+  victim.hp -= dmg;
+  if (victim.hp <= 0) {
+    victim.hp = 0; victim.dead = true; victim.respawnTimer = RESPAWN_TIME; victim.mesh.group.visible = false;
+    if (attacker) { gameState.kills[attacker.team - 1]++; document.getElementById('k1').textContent = gameState.kills[0]; document.getElementById('k2').textContent = gameState.kills[1]; }
+    createExplosion(victim.x, victim.z); sndKill(); showPowerupMsg('💀 击杀!', 0xff0000);
+    queueNetEvent('kill', { victim: allPlayers.indexOf(victim), attacker: attacker ? allPlayers.indexOf(attacker) : -1, x: victim.x, z: victim.z });
+  }
+}
+
+function activateBomb(player, x, z) {
+  createExplosion(x, z); sndBomb();
+  const dx = balls[0].mesh.position.x - x, dz = balls[0].mesh.position.z - z, dist = Math.sqrt(dx * dx + dz * dz) || 1;
+  if (dist < 8) { const f = (8 - dist) * 6; balls[0].state.vx += (dx / dist) * f; balls[0].state.vy += f * 0.6; balls[0].state.vz += (dz / dist) * f; }
+  for (const o of allPlayers) { if (o === player) continue;
+    const odx = o.x - x, odz = o.z - z, od = Math.sqrt(odx * odx + odz * odz);
+    if (od < 4) damagePlayer(o, DMG_BOMB, player);
+    else if (od < 6) { const kf = (6 - od) * 5; o.knockVx += (odx / (od || 1)) * kf; o.knockVz += (odz / (od || 1)) * kf; }
+  }
+}
+
+// ===== 手雷 =====
+const grenades = [];
+function activateGrenade(player) {
+  if (player.grenadeAmmo <= 0) return;
+  if (player._grenadeCooldown > 0 && bosses.length === 0) return;
+  player.grenadeAmmo--; player._grenadeCooldown = 1.0;
+  const spd = 12; let baseVx, baseVz;
+  if (Math.abs(player.vx) > 0.5 || Math.abs(player.vz) > 0.5) { const m = Math.sqrt(player.vx * player.vx + player.vz * player.vz); baseVx = (player.vx / m) * spd; baseVz = (player.vz / m) * spd; }
+  else { baseVx = player.facing * spd; baseVz = 0; }
+  // 一次5发散射
+  for (let n = -2; n <= 2; n++) {
+    const spread = n * 0.2;
+    const cos = Math.cos(spread), sin = Math.sin(spread);
+    const vx = baseVx * cos - baseVz * sin;
+    const vz = baseVx * sin + baseVz * cos;
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), new THREE.MeshStandardMaterial({ color: 0x795548, roughness: 0.8 }));
+    mesh.position.set(player.x + (Math.random() - 0.5) * 0.3, 0.3, player.z + (Math.random() - 0.5) * 0.3); scene.add(mesh);
+    grenades.push({ mesh, vx, vz, vy: 5 + Math.random() * 2, owner: player, life: 1.2 + Math.random() * 0.2, bounces: BOUNCE_MAX, isBoss: false, _id: nextNetId() });
+  }
+}
+function updateGrenades(dt) {
+  for (let i = grenades.length - 1; i >= 0; i--) {
+    const g = grenades[i]; g.life -= dt; g.vy -= 15 * dt;
+    g.mesh.position.x += g.vx * dt; g.mesh.position.y += g.vy * dt; g.mesh.position.z += g.vz * dt;
+    if (g.mesh.position.y < 0.15) { g.mesh.position.y = 0.15; g.vy *= -0.3; g.vx *= 0.6; g.vz *= 0.6; }
+    // 反弹场地边缘
+    for (const e of fieldEdges) {
+      const sd = signedDistToEdge(g.mesh.position.x, g.mesh.position.z, e);
+      if (sd < 0.15) {
+        const dot = g.vx * e.nx + g.vz * e.nz;
+        g.vx -= 2 * dot * e.nx; g.vz -= 2 * dot * e.nz;
+        g.mesh.position.x += e.nx * (0.15 - sd); g.mesh.position.z += e.nz * (0.15 - sd);
+        g.bounces--; if (g.bounces < 0) g.life = 0;
+        break;
+      }
+    }
+    if (g.life <= 0) {
+      createExplosion(g.mesh.position.x, g.mesh.position.z, 30, 0xff6600, 0xff3300); sndBomb();
+      const gx = g.mesh.position.x, gz = g.mesh.position.z;
+      for (const b of balls) {
+        const dx = b.mesh.position.x - gx, dz = b.mesh.position.z - gz, d = Math.sqrt(dx * dx + dz * dz) || 1;
+        if (d < 5) { const f = (5 - d) * 8; b.state.vx += (dx / d) * f; b.state.vy += f * 0.8; b.state.vz += (dz / d) * f; }
+      }
+      for (const p of allPlayers) { if (p === g.owner) continue;
+        const pdx = p.x - gx, pdz = p.z - gz, pd = Math.sqrt(pdx * pdx + pdz * pdz);
+        if (pd < 5) damagePlayer(p, DMG_GRENADE, g.owner);
+        else if (pd < 7) { const kf = (7 - pd) * 4; p.knockVx += (pdx / (pd || 1)) * kf; p.knockVz += (pdz / (pd || 1)) * kf; }
+      }
+      // Boss手雷受伤
+      for (const boss of bosses) { if (boss.dead || g.owner === boss) continue;
+        const pdx = boss.x - gx, pdz = boss.z - gz, pd = Math.sqrt(pdx * pdx + pdz * pdz);
+        if (pd < 5) damageBoss(boss, DMG_GRENADE);
+      }
+      scene.remove(g.mesh); grenades.splice(i, 1);
+    }
+  }
+}
+
+// ===== 核武器 =====
+let nukeFlash = null;
+function activateNuke(player) {
+  createExplosion(0, 0, 80, 0xffeb3b, 0xff6600); createExplosion(5, 5, 40, 0xffffff, 0xffcc00); createExplosion(-5, -5, 40, 0xff3300, 0xffcc00);
+  sndNuke();
+  for (const b of balls) { b.state.vx += (Math.random() - 0.5) * 30; b.state.vy += 25; b.state.vz += (Math.random() - 0.5) * 30; }
+  for (const o of allPlayers) { if (o === player) continue; damagePlayer(o, DMG_NUKE, player); }
+  nukeFlash = { life: 0.8 };
+}
+
+// ===== Boss系统 =====
+const bosses = [];
+const BOSS_HP = 30000;
+const BOSS_SCALE = 4;
+const BOSS_R = PLAYER_R * BOSS_SCALE;
+
+function createBossMesh() {
+  const g = new THREE.Group();
+  // 巨大暗红身体
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(PLAYER_R * 0.5 * BOSS_SCALE, PLAYER_R * 0.55 * BOSS_SCALE, PLAYER_H * BOSS_SCALE, 16),
+    new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.4, metalness: 0.6 }));
+  body.rotation.z = Math.PI / 2; body.castShadow = true; g.add(body);
+  // 大头
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28 * BOSS_SCALE, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0x4a0000, roughness: 0.5, metalness: 0.4 }));
+  head.position.set(0.7 * BOSS_SCALE, 0.12 * BOSS_SCALE, 0); head.castShadow = true; g.add(head);
+  // 角
+  const hornMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.9, roughness: 0.2 });
+  const lh = new THREE.Mesh(new THREE.ConeGeometry(0.15 * BOSS_SCALE, 0.6 * BOSS_SCALE, 8), hornMat);
+  lh.position.set(0.7 * BOSS_SCALE, 0.5 * BOSS_SCALE, -0.25 * BOSS_SCALE); lh.rotation.x = -0.3; g.add(lh);
+  const rh = new THREE.Mesh(new THREE.ConeGeometry(0.15 * BOSS_SCALE, 0.6 * BOSS_SCALE, 8), hornMat);
+  rh.position.set(0.7 * BOSS_SCALE, 0.5 * BOSS_SCALE, 0.25 * BOSS_SCALE); rh.rotation.x = 0.3; g.add(rh);
+  // 发光红眼
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+  const le = new THREE.Mesh(new THREE.SphereGeometry(0.08 * BOSS_SCALE, 6, 6), eyeMat);
+  le.position.set(0.95 * BOSS_SCALE, 0.2 * BOSS_SCALE, -0.15 * BOSS_SCALE); g.add(le);
+  const re = new THREE.Mesh(new THREE.SphereGeometry(0.08 * BOSS_SCALE, 6, 6), eyeMat);
+  re.position.set(0.95 * BOSS_SCALE, 0.2 * BOSS_SCALE, 0.15 * BOSS_SCALE); g.add(re);
+  // 粗大的腿
+  const legGeo = new THREE.CylinderGeometry(0.10 * BOSS_SCALE, 0.08 * BOSS_SCALE, LEG_LEN * BOSS_SCALE, 8);
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x5a0000, roughness: 0.6 });
+  const ll = new THREE.Mesh(legGeo, legMat); ll.position.set(-0.3 * BOSS_SCALE, -0.05 * BOSS_SCALE, -0.35 * BOSS_SCALE); ll.castShadow = true; g.add(ll);
+  const rl = new THREE.Mesh(legGeo, legMat); rl.position.set(-0.3 * BOSS_SCALE, -0.05 * BOSS_SCALE, 0.35 * BOSS_SCALE); rl.castShadow = true; g.add(rl);
+  // 血条
+  const hpBar = createHPBar(); hpBar.sprite.scale.set(4, 0.4, 1); hpBar.sprite.position.y = 2.5 * BOSS_SCALE; g.add(hpBar.sprite);
+  scene.add(g);
+  return { group: g, body, head, leftLeg: ll, rightLeg: rl, hpBar };
+}
+
+function spawnBoss(spawner) {
+  const mesh = createBossMesh();
+  let px, pz;
+  do { px = (Math.random() - 0.5) * FIELD_W * 1.5; pz = (Math.random() - 0.5) * FIELD_H * 1.5; } while (!isInsidePolygon(px, pz));
+  const boss = {
+    mesh, x: px, z: pz, y: 0, vx: 0, vz: 0, facing: 1,
+    hp: BOSS_HP, dead: false, gunAmmo: Infinity, sniperAmmo: Infinity, grenadeAmmo: Infinity,
+    gunFireTimer: 0, sniperTimer: 0, grenadeCooldown: 0, kickTimer: 0,
+    wrigglePhase: 0, invincible: 0, _id: nextNetId()
+  };
+  bosses.push(boss);
+  showPowerupMsg('👹 BOSS降临!', 0xff0000);
+  createExplosion(px, pz, 40, 0xff0000, 0xff6600);
+  sndNuke();
+  queueNetEvent('boss_spawn', { id: boss._id, x: px, z: pz });
+}
+
+function updateBossHP(boss) {
+  const c = boss.mesh.hpBar.canvas, ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, 128, 16);
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, 128, 16);
+  const pct = Math.max(0, boss.hp / BOSS_HP);
+  ctx.fillStyle = `rgb(${Math.floor(255 * (1 - pct))},${Math.floor(80 * pct)},0)`;
+  ctx.fillRect(1, 1, 126 * pct, 14);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(Math.ceil(boss.hp), 64, 8);
+  boss.mesh.hpBar.tex.needsUpdate = true;
+}
+
+function updateBosses(dt) {
+  for (let bi = bosses.length - 1; bi >= 0; bi--) {
+    const boss = bosses[bi];
+    if (boss.dead) continue;
+    // Boss受伤检测 - 子弹、狙击、火箭
+    // (在各自updateBullets等中处理)
+
+    // 找最近的玩家攻击
+    let target = null, tDist = Infinity;
+    for (const p of allPlayers) {
+      if (p.dead) continue;
+      const d = Math.sqrt((p.x - boss.x) ** 2 + (p.z - boss.z) ** 2);
+      if (d < tDist) { tDist = d; target = p; }
+    }
+    // 也攻击其他Boss
+    for (const ob of bosses) {
+      if (ob === boss || ob.dead) continue;
+      const d = Math.sqrt((ob.x - boss.x) ** 2 + (ob.z - boss.z) ** 2);
+      if (d < tDist) { tDist = d; target = ob; }
+    }
+
+    const moveSpeed = MOVE_SPEED * 0.6;
+    if (target) {
+      const dx = (target.x || 0) - boss.x, dz = (target.z || 0) - boss.z;
+      const dist = Math.sqrt(dx * dx + dz * dz) || 1;
+      boss.vx += (dx / dist) * moveSpeed * dt;
+      boss.vz += (dz / dist) * moveSpeed * dt;
+      if (Math.abs(dx) > 0.5) boss.facing = dx > 0 ? 1 : -1;
+    }
+    boss.vx *= PLAYER_FRIC; boss.vz *= PLAYER_FRIC;
+    boss.x += boss.vx * dt; boss.z += boss.vz * dt;
+    const c = constrainToField(boss.x, boss.z, BOSS_R);
+    boss.x = c.x; boss.z = c.z;
+    boss.wrigglePhase += Math.sqrt(boss.vx * boss.vx + boss.vz * boss.vz) * dt * WRIGGLE_SPEED;
+
+    // Boss攻击
+    boss.gunFireTimer -= dt;
+    boss.sniperTimer -= dt;
+    boss.grenadeCooldown -= dt;
+
+    // 冲锋枪 - 持续射击
+    if (target && tDist < 15 && boss.gunFireTimer <= 0) {
+      const bMesh = new THREE.Mesh(new THREE.SphereGeometry(0.12, 4, 4), new THREE.MeshBasicMaterial({ color: 0xff4400 }));
+      bMesh.position.set(boss.x, 0.5, boss.z); scene.add(bMesh);
+      const speed = 35;
+      let vx, vz;
+      const dx = (target.x || 0) - boss.x, dz = (target.z || 0) - boss.z, dm = Math.sqrt(dx * dx + dz * dz) || 1;
+      vx = (dx / dm) * speed; vz = (dz / dm) * speed;
+      bullets.push({ mesh: bMesh, vx, vz, owner: boss, bounces: BOUNCE_MAX, isBoss: true, _id: nextNetId() });
+      boss.gunFireTimer = 0.08;
+      sndGun();
+    }
+    // 狙击枪
+    if (target && tDist < 20 && boss.sniperTimer <= 0) {
+      const sMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.8, 6), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+      sMesh.rotation.z = Math.PI / 2; sMesh.position.set(boss.x, 0.5, boss.z); scene.add(sMesh);
+      const speed = 55;
+      const dx = (target.x || 0) - boss.x, dz = (target.z || 0) - boss.z, dm = Math.sqrt(dx * dx + dz * dz) || 1;
+      sniperRounds.push({ mesh: sMesh, vx: (dx / dm) * speed, vz: (dz / dm) * speed, owner: boss, bounces: BOUNCE_MAX, isBoss: true, _id: nextNetId() });
+      boss.sniperTimer = 1.5;
+      sndSniper();
+    }
+    // 手雷
+    if (target && tDist < 12 && boss.grenadeCooldown <= 0) {
+      const gMesh = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0xff0000, emissiveIntensity: 0.5 }));
+      gMesh.position.set(boss.x, 0.5, boss.z); scene.add(gMesh);
+      const spd = 15;
+      const dx = (target.x || 0) - boss.x, dz = (target.z || 0) - boss.z, dm = Math.sqrt(dx * dx + dz * dz) || 1;
+      grenades.push({ mesh: gMesh, vx: (dx / dm) * spd, vz: (dz / dm) * spd, vy: 6, owner: boss, life: 1.0, bounces: 2, isBoss: true, _id: nextNetId() });
+      boss.grenadeCooldown = 1.0;
+    }
+
+    // Boss碰撞伤害 + 物理推开玩家
+    for (const p of allPlayers) {
+      if (p.dead) continue;
+      const dx = p.x - boss.x, dz = p.z - boss.z, dist = Math.sqrt(dx * dx + dz * dz);
+      const minDist = BOSS_R + PLAYER_R;
+      if (dist < minDist && dist > 0.01) {
+        damagePlayer(p, 5, boss);
+        const nd = dist || 1;
+        const overlap = minDist - dist;
+        // 推开玩家
+        p.x += (dx / nd) * overlap;
+        p.z += (dz / nd) * overlap;
+        p.knockVx += (dx / nd) * 25;
+        p.knockVz += (dz / nd) * 25;
+      }
+    }
+    // Boss之间碰撞
+    for (const ob of bosses) {
+      if (ob === boss || ob.dead) continue;
+      const dx = boss.x - ob.x, dz = boss.z - ob.z, dist = Math.sqrt(dx * dx + dz * dz);
+      const minDist = BOSS_R * 2;
+      if (dist < minDist && dist > 0.01) {
+        const nd = dist || 1;
+        const overlap = (minDist - dist) * 0.5;
+        boss.x += (dx / nd) * overlap;
+        boss.z += (dz / nd) * overlap;
+        ob.x -= (dx / nd) * overlap;
+        ob.z -= (dz / nd) * overlap;
+        damageBoss(ob, 2);
+      }
+    }
+    // Boss推球/踢球
+    for (const b of balls) {
+      const dx = b.mesh.position.x - boss.x, dz = b.mesh.position.z - boss.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      const minDist = BOSS_R + b._radius;
+      if (dist < minDist && dist > 0.01) {
+        const nd = dist || 1;
+        const overlap = minDist - dist;
+        b.mesh.position.x += (dx / nd) * overlap;
+        b.mesh.position.z += (dz / nd) * overlap;
+        b.state.vx += (dx / nd) * 15 + boss.vx * 0.5;
+        b.state.vy += 3;
+        b.state.vz += (dz / nd) * 15 + boss.vz * 0.5;
+        b.state.lastTouch = null;
+      }
+    }
+
+    // 更新Boss mesh
+    boss.mesh.group.position.set(boss.x, boss.y, boss.z);
+    const s2d = Math.sqrt(boss.vx * boss.vx + boss.vz * boss.vz);
+    if (s2d > 0.3) boss.mesh.group.rotation.y = -Math.atan2(boss.vz, boss.vx) + Math.PI / 2;
+    const wr = Math.sin(boss.wrigglePhase) * 0.06 * Math.min(s2d / 2, 1);
+    boss.mesh.body.rotation.y = wr;
+    // 发光效果
+    boss.mesh.body.material.emissiveIntensity = 0.2 + Math.sin(Date.now() * 0.005) * 0.1;
+    boss.mesh.body.material.emissive = new THREE.Color(0xff0000);
+    updateBossHP(boss);
+
+    // Boss死亡
+    if (boss.hp <= 0) {
+      boss.dead = true;
+      createExplosion(boss.x, boss.z, 60, 0xff0000, 0xff6600);
+      createExplosion(boss.x + 2, boss.z, 30, 0xffcc00, 0xff3300);
+      createExplosion(boss.x - 2, boss.z, 30, 0xff6600, 0xffffff);
+      sndNuke();
+      scene.remove(boss.mesh.group);
+      bosses.splice(bi, 1);
+      showPowerupMsg('💀 BOSS被击败!', 0xffcc00);
+      queueNetEvent('boss_die', { id: boss._id, x: boss.x, z: boss.z });
+    }
+  }
+}
+
+function damageBoss(boss, dmg) {
+  boss.hp -= dmg;
+}
+
+// ===== 重生 =====
+function updateDead(dt) {
+  for (const p of allPlayers) { if (p.dead) { p.respawnTimer -= dt;
+    if (p.respawnTimer <= 0) { p.dead = false; p.hp = MAX_HP; p.invincible = INVINCIBLE_TIME; p.reset(); p.mesh.group.visible = true; p.heldPowerup = null; p.buffs = { speed: 0, frozen: 0, bigKick: 0, magnet: 0, shield: 0 }; p.speedMultiplier = 1.0; p.gunAmmo = 0; p.sniperAmmo = 0; p.grenadeAmmo = 99999999999; }
+  } else if (p.invincible > 0) { p.invincible -= dt; if (p.invincible < 0) p.invincible = 0; } }
+}
+function updateRespawnUI() {
+  const el = document.getElementById('respawnBar'); let html = '';
+  for (const p of allPlayers) { if (p.dead) {
+    const name = p === p1 ? 'P1' : p === p2 ? 'P2' : p === ai1 ? 'AI1' : 'AI2';
+    const color = p.team === 1 ? '#4fc3f7' : '#ef5350';
+    html += `<span class="respawn-tag" style="color:${color}">${name} 复活 ${Math.ceil(p.respawnTimer)}s</span>`;
+  }}
+  for (const boss of bosses) { if (!boss.dead) {
+    html += `<span class="respawn-tag" style="color:#ff0000">👹BOSS HP:${Math.ceil(boss.hp)}</span>`;
+  }}
+  el.innerHTML = html;
+}
+
+// ===== 火箭弹（5发散射）=====
+const rockets = [];
+function activateRocket(player) {
+  const speed = 25;
+  let baseDx, baseDz;
+  if (Math.abs(player.vx) > 0.5 || Math.abs(player.vz) > 0.5) { const m = Math.sqrt(player.vx * player.vx + player.vz * player.vz); baseDx = player.vx / m; baseDz = player.vz / m; }
+  else { baseDx = player.facing; baseDz = 0; }
+  for (let n = -2; n <= 2; n++) {
+    const spread = n * 0.15;
+    const cos = Math.cos(spread), sin = Math.sin(spread);
+    const dx = baseDx * cos - baseDz * sin, dz = baseDx * sin + baseDz * cos;
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.6, 8), new THREE.MeshStandardMaterial({ color: 0xff1744, emissive: 0xff1744, emissiveIntensity: 0.6 }));
+    mesh.rotation.z = Math.PI / 2; mesh.position.set(player.x, 0.3, player.z); scene.add(mesh);
+    rockets.push({ mesh, vx: dx * speed, vz: dz * speed, owner: player, bounces: BOUNCE_MAX, isBoss: false, _id: nextNetId() });
+  }
+}
+function updateRockets(dt) {
+  for (let i = rockets.length - 1; i >= 0; i--) {
+    const r = rockets[i]; r.mesh.position.x += r.vx * dt; r.mesh.position.z += r.vz * dt;
+    let bounced = false;
+    for (const e of fieldEdges) {
+      const sd = signedDistToEdge(r.mesh.position.x, r.mesh.position.z, e);
+      if (sd < 0.15) {
+        const dot = r.vx * e.nx + r.vz * e.nz;
+        r.vx -= 2 * dot * e.nx; r.vz -= 2 * dot * e.nz;
+        r.mesh.position.x += e.nx * (0.15 - sd); r.mesh.position.z += e.nz * (0.15 - sd);
+        r.bounces--; bounced = true; break;
+      }
+    }
+    let hit = false;
+    for (const p of allPlayers) { if (p === r.owner || p.dead) continue;
+      if (Math.sqrt((p.x - r.mesh.position.x) ** 2 + (p.z - r.mesh.position.z) ** 2) < PLAYER_R + 0.3) { damagePlayer(p, DMG_ROCKET, r.owner); hit = true; break; }
+    }
+    // Boss受伤
+    if (!hit) for (const boss of bosses) { if (boss.dead || r.owner === boss) continue;
+      if (Math.sqrt((boss.x - r.mesh.position.x) ** 2 + (boss.z - r.mesh.position.z) ** 2) < BOSS_R + 0.4) { damageBoss(boss, DMG_ROCKET); hit = true; break; }
+    }
+    if (hit || r.bounces < 0) { if (hit) { createExplosion(r.mesh.position.x, r.mesh.position.z); sndBomb(); } scene.remove(r.mesh); rockets.splice(i, 1); }
+  }
+}
+
+// ===== 电击 =====
+const zapBeams = [];
+function activateZap(player) {
+  let closest = null, cd = 10;
+  for (const o of allPlayers) { if (o === player || o.dead) continue;
+    const d = Math.sqrt((o.x - player.x) ** 2 + (o.z - player.z) ** 2); if (d < cd) { cd = d; closest = o; } }
+  if (!closest) return; damagePlayer(closest, DMG_ZAP, player);
+  const pts = [new THREE.Vector3(player.x, 0.3, player.z), new THREE.Vector3(closest.x, 0.3, closest.z)];
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x00e5ff, linewidth: 3 }));
+  scene.add(line); zapBeams.push({ mesh: line, life: 0.3 }); sndZap();
+}
+function updateZapBeams(dt) { for (let i = zapBeams.length - 1; i >= 0; i--) { zapBeams[i].life -= dt; if (zapBeams[i].life <= 0) { scene.remove(zapBeams[i].mesh); zapBeams.splice(i, 1); } } }
+
+// ===== 冲锋枪 =====
+const bullets = [];
+function fireBullet(player) {
+  if (player.gunAmmo <= 0) return; player.gunAmmo--;
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.08, 4, 4), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
+  mesh.position.set(player.x, 0.3, player.z); scene.add(mesh);
+  const speed = 30; let vx, vz;
+  if (Math.abs(player.vx) > 0.5 || Math.abs(player.vz) > 0.5) { const m = Math.sqrt(player.vx * player.vx + player.vz * player.vz); vx = (player.vx / m) * speed; vz = (player.vz / m) * speed; }
+  else { vx = player.facing * speed; vz = 0; }
+  bullets.push({ mesh, vx, vz, owner: player, bounces: BOUNCE_MAX, isBoss: false, _id: nextNetId() }); sndGun();
+}
+function updateBullets(dt) {
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i]; b.mesh.position.x += b.vx * dt; b.mesh.position.z += b.vz * dt;
+    for (const e of fieldEdges) {
+      const sd = signedDistToEdge(b.mesh.position.x, b.mesh.position.z, e);
+      if (sd < 0) {
+        const dot = b.vx * e.nx + b.vz * e.nz;
+        b.vx -= 2 * dot * e.nx; b.vz -= 2 * dot * e.nz;
+        b.mesh.position.x += e.nx * (-sd); b.mesh.position.z += e.nz * (-sd);
+        b.bounces--; break;
+      }
+    }
+    let hit = false;
+    for (const p of allPlayers) { if (p === b.owner || p.dead) continue;
+      if (Math.sqrt((p.x - b.mesh.position.x) ** 2 + (p.z - b.mesh.position.z) ** 2) < PLAYER_R + 0.15) { damagePlayer(p, DMG_GUN, b.owner); hit = true; break; }
+    }
+    // Boss受伤
+    if (!hit) for (const boss of bosses) { if (boss.dead || b.owner === boss) continue;
+      if (Math.sqrt((boss.x - b.mesh.position.x) ** 2 + (boss.z - b.mesh.position.z) ** 2) < BOSS_R + 0.2) { damageBoss(boss, DMG_GUN); hit = true; break; }
+    }
+    if (hit || b.bounces < 0) { scene.remove(b.mesh); bullets.splice(i, 1); }
+  }
+}
+
+// ===== 狙击枪 =====
+const sniperRounds = [];
+function fireSniper(player) {
+  if (player.sniperAmmo <= 0) return; player.sniperAmmo--;
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 6), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+  mesh.rotation.z = Math.PI / 2; mesh.position.set(player.x, 0.3, player.z); scene.add(mesh);
+  const speed = 50; let vx, vz;
+  if (Math.abs(player.vx) > 0.5 || Math.abs(player.vz) > 0.5) { const m = Math.sqrt(player.vx * player.vx + player.vz * player.vz); vx = (player.vx / m) * speed; vz = (player.vz / m) * speed; }
+  else { vx = player.facing * speed; vz = 0; }
+  sniperRounds.push({ mesh, vx, vz, owner: player, bounces: BOUNCE_MAX, isBoss: false, _id: nextNetId() }); sndSniper();
+}
+function updateSniperRounds(dt) {
+  for (let i = sniperRounds.length - 1; i >= 0; i--) {
+    const s = sniperRounds[i]; s.mesh.position.x += s.vx * dt; s.mesh.position.z += s.vz * dt;
+    s.mesh.rotation.y = -Math.atan2(s.vz, s.vx) + Math.PI / 2;
+    for (const e of fieldEdges) {
+      const sd = signedDistToEdge(s.mesh.position.x, s.mesh.position.z, e);
+      if (sd < 0) {
+        const dot = s.vx * e.nx + s.vz * e.nz;
+        s.vx -= 2 * dot * e.nx; s.vz -= 2 * dot * e.nz;
+        s.mesh.position.x += e.nx * (-sd); s.mesh.position.z += e.nz * (-sd);
+        s.bounces--; break;
+      }
+    }
+    let hit = false;
+    for (const p of allPlayers) { if (p === s.owner || p.dead) continue;
+      if (Math.sqrt((p.x - s.mesh.position.x) ** 2 + (p.z - s.mesh.position.z) ** 2) < PLAYER_R + 0.2) { damagePlayer(p, DMG_SNIPER, s.owner); hit = true; break; }
+    }
+    // Boss受伤
+    if (!hit) for (const boss of bosses) { if (boss.dead || s.owner === boss) continue;
+      if (Math.sqrt((boss.x - s.mesh.position.x) ** 2 + (boss.z - s.mesh.position.z) ** 2) < BOSS_R + 0.3) { damageBoss(boss, DMG_SNIPER); hit = true; break; }
+    }
+    if (hit || s.bounces < 0) { if (hit) createExplosion(s.mesh.position.x, s.mesh.position.z, 5); scene.remove(s.mesh); sniperRounds.splice(i, 1); }
+  }
+}
+
+// 瞄准射线
+const aimLines = [];
+function updateAimLines() {
+  for (const l of aimLines) scene.remove(l); aimLines.length = 0;
+  if (!p1.dead && p1.gunAmmo > 0 && keys['e']) createAimLine(p1, 0xffff00);
+  if (!p1.dead && p1.sniperAmmo > 0 && keys['q']) createAimLine(p1, 0xff0000);
+  if (!p2.dead && p2.gunAmmo > 0 && keys['.']) createAimLine(p2, 0xffff00);
+  if (!p2.dead && p2.sniperAmmo > 0 && keys[',']) createAimLine(p2, 0xff0000);
+}
+function createAimLine(player, color) {
+  let dx, dz;
+  if (Math.abs(player.vx) > 0.5 || Math.abs(player.vz) > 0.5) { const m = Math.sqrt(player.vx * player.vx + player.vz * player.vz); dx = player.vx / m; dz = player.vz / m; }
+  else { dx = player.facing; dz = 0; }
+  const pts = [new THREE.Vector3(player.x, 0.3, player.z), new THREE.Vector3(player.x + dx * 10, 0.3, player.z + dz * 10)];
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineDashedMaterial({ color, dashSize: 0.3, gapSize: 0.2, transparent: true, opacity: 0.6 }));
+  line.computeLineDistances(); scene.add(line); aimLines.push(line);
+}
+
+// ===== Buff更新 =====
+function updateBuffs(dt) { for (const p of allPlayers) { if (p.dead) continue;
+  for (const key of Object.keys(p.buffs)) { if (p.buffs[key] > 0) { p.buffs[key] -= dt; if (p.buffs[key] <= 0) { p.buffs[key] = 0;
+    if (key === 'speed') p.speedMultiplier = 1.0; if (key === 'frozen') removeFreezeEffect(p); if (key === 'shield') removeShieldEffect(p); } } }
+} }
+function showPowerupMsg(text, color) { const el = document.getElementById('powerupMsg'); el.textContent = text; el.style.color = '#' + color.toString(16).padStart(6, '0'); el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 1200); }
+
+// ===== 血条 =====
+function createHPBar() {
+  const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 16;
+  const tex = new THREE.CanvasTexture(canvas); tex.minFilter = THREE.LinearFilter;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  sprite.scale.set(1.2, 0.15, 1); return { sprite, tex, canvas };
+}
+function updateHPBar(player) {
+  const c = player.hpBar.canvas, ctx = c.getContext('2d'); ctx.clearRect(0, 0, 128, 16);
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, 128, 16);
+  const pct = player.hp / MAX_HP; const r = Math.floor(255 * (1 - pct)), g = Math.floor(255 * pct);
+  ctx.fillStyle = `rgb(${r},${g},0)`; ctx.fillRect(1, 1, 126 * pct, 14);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(Math.ceil(player.hp), 64, 8); player.hpBar.tex.needsUpdate = true;
+}
+
+// ===== 创建玩家 =====
+function createPlayer(color, num) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(PLAYER_R * 0.5, PLAYER_R * 0.55, PLAYER_H, 16), new THREE.MeshStandardMaterial({ color, roughness: 0.6 }));
+  body.rotation.z = Math.PI / 2; body.castShadow = true; g.add(body);
+  const c2 = document.createElement('canvas'); c2.width = 64; c2.height = 64;
+  const ctx = c2.getContext('2d'); ctx.fillStyle = '#fff'; ctx.font = 'bold 48px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(num, 32, 32);
+  const np = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.4), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c2), transparent: true }));
+  np.position.set(0, 0.3, 0); np.rotation.x = -Math.PI / 2; g.add(np);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 12), new THREE.MeshStandardMaterial({ color: 0xffcc80, roughness: 0.7 }));
+  head.position.set(0.7, 0.12, 0); head.castShadow = true; g.add(head);
+  const hc = color === 0x4fc3f7 ? 0x1565c0 : color === 0xef5350 ? 0xc62828 : color === 0x81d4fa ? 0x0d47a1 : 0xb71c1c;
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.29, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: hc }));
+  hair.position.set(0.7, 0.15, 0); g.add(hair);
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), new THREE.MeshBasicMaterial({ color: 0x111111 }));
+  eye.position.set(0.95, 0.16, -0.1); g.add(eye);
+  const legGeo = new THREE.CylinderGeometry(0.10, 0.08, LEG_LEN, 8);
+  const legMat = new THREE.MeshStandardMaterial({ color, roughness: 0.6 });
+  const leftLeg = new THREE.Mesh(legGeo, legMat); leftLeg.position.set(-0.3, -0.05, -0.35); leftLeg.castShadow = true; g.add(leftLeg);
+  const rightLeg = new THREE.Mesh(legGeo, legMat); rightLeg.position.set(-0.3, -0.05, 0.35); rightLeg.castShadow = true; g.add(rightLeg);
+  const footMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+  const leftFoot = new THREE.Mesh(new THREE.SphereGeometry(0.10, 8, 8), footMat); leftFoot.position.set(-0.3 + Math.cos(0.5) * LEG_LEN * 0.5, -0.05 - Math.sin(0.5) * LEG_LEN * 0.5, -0.35); g.add(leftFoot);
+  const rightFoot = new THREE.Mesh(new THREE.SphereGeometry(0.10, 8, 8), footMat); rightFoot.position.set(-0.3 + Math.cos(0.5) * LEG_LEN * 0.5, -0.05 - Math.sin(0.5) * LEG_LEN * 0.5, 0.35); g.add(rightFoot);
+  const armMat = new THREE.MeshStandardMaterial({ color: 0xffcc80, roughness: 0.7 });
+  const la = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.6, 8), armMat); la.position.set(0.2, -0.02, -0.4); la.rotation.z = 0.3; g.add(la);
+  const ra = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.6, 8), armMat); ra.position.set(0.2, -0.02, 0.4); ra.rotation.z = 0.3; g.add(ra);
+  const hpBar = createHPBar(); hpBar.sprite.position.y = 1.2; g.add(hpBar.sprite);
+  scene.add(g);
+  return { group: g, body, leftLeg, rightLeg, leftFoot, rightFoot, head, hair, eye, leftArm: la, rightArm: ra, hpBar };
+}
+
+// ===== 玩家状态 =====
+class PlayerState {
+  constructor(mesh, startX, startZ, facing, color, team, isAI = false) {
+    this.mesh = mesh; this.startX = startX; this.startZ = startZ; this.facing = facing; this.color = color; this.team = team; this.isAI = isAI;
+    this.wrigglePhase = Math.random() * Math.PI * 2; this.heldPowerup = null; this.speedMultiplier = 1.0;
+    this.dead = false; this.respawnTimer = 0; this.invincible = 0; this.hp = MAX_HP;
+    this.hpBar = mesh.hpBar;
+    this.gunAmmo = 0; this.sniperAmmo = 0; this.grenadeAmmo = 99999999999; this.gunFireTimer = 0; this.aiGunTimer = 0; this._grenadeCooldown = 0;
+    this._sniperFired = false;
+    this.buffs = { speed: 0, frozen: 0, bigKick: 0, magnet: 0, shield: 0 }; this.reset();
+  }
+  reset() { this.x = this.startX; this.z = this.startZ; this.y = 0; this.vx = 0; this.vy = 0; this.vz = 0;
+    this.leftLeg = 0; this.rightLeg = 0; this.leftTimer = 0; this.rightTimer = 0;
+    this.knockVx = 0; this.knockVz = 0; this.aiKickTimer = 0; this.wrigglePhase = Math.random() * Math.PI * 2; }
+  getLegPositions() {
+    const la = this.leftLeg === 1 ? 1.0 : this.leftLeg === -1 ? 0.1 : 0.5;
+    const ra = this.rightLeg === 1 ? 1.0 : this.rightLeg === -1 ? 0.1 : 0.5;
+    return { lAngle: la, rAngle: ra };
+  }
+  updateAI(dt) {
+    if (this.dead || this.buffs.frozen > 0) return;
+    if (this._grenadeCooldown > 0) this._grenadeCooldown -= dt;
+    // 找最近的球
+    let nearBall = balls[0], nearDist = Infinity;
+    for (const b of balls) { const d = Math.sqrt((b.mesh.position.x - this.x) ** 2 + (b.mesh.position.z - this.z) ** 2); if (d < nearDist) { nearDist = d; nearBall = b; } }
+    const bx = nearBall.mesh.position.x, bz = nearBall.mesh.position.z, dx = bx - this.x, dz = bz - this.z, dist = Math.sqrt(dx * dx + dz * dz);
+    const speed = MOVE_SPEED * 0.88 * this.speedMultiplier;
+    // 朝对方球门进攻
+    const myGoals = goalSegments.filter(g => g.team !== this.team);
+    const myGoal = myGoals.length > 0 ? myGoals[Math.floor(Math.random() * myGoals.length)] : null;
+    const goalX = myGoal ? myGoal.cx : 0;
+    const goalZ = myGoal ? myGoal.cz : 0;
+    if (dist > 1.5) { this.vx += (dx / dist) * speed * dt; this.vz += (dz / dist) * speed * dt; }
+    else if (dist < 2) { const tgx = goalX - this.x, tgz = goalZ - this.z, tgm = Math.sqrt(tgx * tgx + tgz * tgz) || 1; this.vx += (tgx / tgm) * speed * dt; this.vz += (tgz / tgm) * speed * dt; }
+    if (Math.abs(dx) > 0.5) this.facing = dx > 0 ? 1 : -1;
+    if (dist < 2.5) { this.aiKickTimer -= dt; if (this.aiKickTimer <= 0) { if (Math.random() < 0.5 && this.leftTimer <= 0) { this.leftLeg = 1; this.leftTimer = 0.3; } else if (this.rightTimer <= 0) { this.rightLeg = 1; this.rightTimer = 0.3; } this.aiKickTimer = 0.3 + Math.random() * 0.3; } }
+    if (this.gunAmmo > 0) { this.aiGunTimer -= dt; if (this.aiGunTimer <= 0) { for (const o of allPlayers) { if (o === this || o.dead) continue; const ed = Math.sqrt((o.x - this.x) ** 2 + (o.z - this.z) ** 2); if (ed < 10) { fireBullet(this); this.aiGunTimer = 0.12; break; } } } }
+    if (this.sniperAmmo > 0 && Math.random() < 0.005) fireSniper(this);
+    if (this.grenadeAmmo > 0 && Math.random() < 0.01) activateGrenade(this);
+    checkPowerupPickup(this);
+    if (this.heldPowerup && Math.random() < 0.008) { activatePowerup(this, this.heldPowerup); this.heldPowerup = null; }
+  }
+  update(dt, leftKey, rightKey, upKey, downKey, leftLegKey, rightLegKey) {
+    if (this.dead || this.buffs.frozen > 0) return;
+    if (this.isAI) { this.updateAI(dt); }
+    else { if (this._grenadeCooldown > 0) this._grenadeCooldown -= dt;
+      const speed = MOVE_SPEED * this.speedMultiplier;
+      if (keys[leftKey]) this.vx -= speed * dt; if (keys[rightKey]) this.vx += speed * dt;
+      if (keys[upKey]) this.vz -= speed * dt; if (keys[downKey]) this.vz += speed * dt;
+      if (keys[leftLegKey] && this.leftTimer <= 0) { this.leftLeg = 1; this.leftTimer = 0.3; }
+      if (keys[rightLegKey] && this.rightTimer <= 0) { this.rightLeg = 1; this.rightTimer = 0.3; }
+      checkPowerupPickup(this); }
+    this.physUpdate(dt);
+  }
+  physUpdate(dt) {
+    if (this.dead || this.buffs.frozen > 0) return;
+    if (this.leftTimer > 0) { this.leftTimer -= dt; if (this.leftTimer <= 0) { this.leftLeg = -1; setTimeout(() => { if (this.leftLeg === -1) this.leftLeg = 0; }, 100); } }
+    if (this.rightTimer > 0) { this.rightTimer -= dt; if (this.rightTimer <= 0) { this.rightLeg = -1; setTimeout(() => { if (this.rightLeg === -1) this.rightLeg = 0; }, 100); } }
+    this.x += (this.vx + this.knockVx) * dt; this.z += (this.vz + this.knockVz) * dt;
+    this.vx *= PLAYER_FRIC; this.vz *= PLAYER_FRIC; this.knockVx *= 0.9; this.knockVz *= 0.9;
+    if (Math.abs(this.knockVx) < 0.1) this.knockVx = 0; if (Math.abs(this.knockVz) < 0.1) this.knockVz = 0;
+    // 场地约束
+    const c = constrainToField(this.x, this.z, PLAYER_R);
+    this.x = c.x; this.z = c.z;
+    this.wrigglePhase += Math.sqrt(this.vx * this.vx + this.vz * this.vz) * dt * WRIGGLE_SPEED;
+    // 强力磁铁
+    if (this.buffs.magnet > 0) {
+      for (const b of balls) {
+        const mdx = this.x - b.mesh.position.x, mdz = this.z - b.mesh.position.z, md = Math.sqrt(mdx * mdx + mdz * mdz);
+        if (md < 10 && md > 0.3) { b.state.vx += (mdx / md) * 15 * dt; b.state.vz += (mdz / md) * 15 * dt; }
+      }
+    }
+  }
+  pushBall(bs, ball) { if (this.dead || this.buffs.frozen > 0) return;
+    const br = ball._radius;
+    const dx = ball.mesh.position.x - this.x, dy = ball.mesh.position.y - (this.y + 0.2), dz = ball.mesh.position.z - this.z, dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const pd = PLAYER_R + br + 0.1; if (dist < pd && dist > 0.01) { bs.lastTouch = this; const nx = dx / dist, ny = dy / dist, nz = dz / dist, o = pd - dist;
+      ball.mesh.position.x += nx * o; ball.mesh.position.y += ny * o; ball.mesh.position.z += nz * o;
+      bs.vx += nx * 6 + this.vx * 0.5; bs.vy += ny * 1.8 + 0.5; bs.vz += nz * 6 + this.vz * 0.5; } }
+  kickBall(bs, ball) { if (this.dead || this.buffs.frozen > 0) return;
+    const br = ball._radius;
+    const legs = this.getLegPositions();
+    const lf = { x: this.x + (-0.3 + Math.cos(legs.lAngle) * LEG_LEN * this.facing), y: this.y - 0.05 - Math.sin(legs.lAngle) * LEG_LEN, z: this.z - 0.35 };
+    const rf = { x: this.x + (-0.3 + Math.cos(legs.rAngle) * LEG_LEN * this.facing), y: this.y - 0.05 - Math.sin(legs.rAngle) * LEG_LEN, z: this.z + 0.35 };
+    this._kick(lf, bs, ball, this.leftLeg === 1, br); this._kick(rf, bs, ball, this.rightLeg === 1, br);
+    if (this.leftLeg === 1 && this.rightLeg === 1) { const cx = (lf.x + rf.x) / 2, cy = (lf.y + rf.y) / 2, cz = (lf.z + rf.z) / 2;
+      const dx = ball.mesh.position.x - cx, dy = ball.mesh.position.y - cy, dz = ball.mesh.position.z - cz;
+      if (Math.sqrt(dx * dx + dy * dy + dz * dz) < br + 0.8) { bs.vx *= 0.2; bs.vy *= 0.2; bs.vz *= 0.2; ball.mesh.position.x = cx; ball.mesh.position.y = cy + br + 0.05; ball.mesh.position.z = cz; } } }
+  _kick(foot, bs, ball, kicking, br) { const dx = ball.mesh.position.x - foot.x, dy = ball.mesh.position.y - foot.y, dz = ball.mesh.position.z - foot.z, dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (dist < br + 0.4 && kicking) { bs.lastTouch = this; const nd = dist || 1; const ra = (Math.random() - 0.5) * 1.2, cr = Math.cos(ra), sr = Math.sin(ra);
+      const dirX = dx / nd, dirZ = dz / nd; const km = this.buffs.bigKick > 0 ? 2.5 : 1.0;
+      bs.vx += (dirX * cr - dirZ * sr) * KICK_FORCE * km + this.vx * 0.2; bs.vy += 2.5 * km; bs.vz += (dirX * sr + dirZ * cr) * KICK_FORCE * km + this.vz * 0.2;
+      bs.spinX = (Math.random() - 0.5) * 8; bs.spinY = (Math.random() - 0.5) * 6; bs.spinZ = (Math.random() - 0.5) * 8; sndKick(); } }
+  collidePlayer(other) { if (this.dead || other.dead) return;
+    const dx = this.x - other.x, dz = this.z - other.z, dist = Math.sqrt(dx * dx + dz * dz), md = PLAYER_R * 1.8;
+    if (dist < md && dist > 0) { const nx = dx / dist, nz = dz / dist, o = md - dist;
+      this.x += nx * o * 0.5; other.x -= nx * o * 0.5; this.z += nz * o * 0.5; other.z -= nz * o * 0.5;
+      const rv = Math.sqrt((this.vx - other.vx) ** 2 + (this.vz - other.vz) ** 2);
+      if (rv > 0.5) { const kb = other.buffs.shield ? KNOCKBACK * 0.15 : KNOCKBACK, kbs = this.buffs.shield ? KNOCKBACK * 0.03 : KNOCKBACK * 0.15, f = Math.max(rv / 3, 1);
+        other.knockVx += -nx * kb * f + (this.vx - other.vx) * 0.6; other.knockVz += -nz * kb * f + (this.vz - other.vz) * 0.6;
+        this.knockVx += nx * kbs; this.knockVz += nz * kbs; } } }
+  updateMesh() { if (this.dead) return; const m = this.mesh;
+    m.group.position.set(this.x, this.y, this.z);
+    const s2d = Math.sqrt(this.vx * this.vx + this.vz * this.vz);
+    if (s2d > 0.3) m.group.rotation.y = -Math.atan2(this.vz, this.vx) + Math.PI / 2;
+    const wr = Math.sin(this.wrigglePhase) * 0.08 * Math.min(s2d / 2, 1);
+    m.body.rotation.y = wr; m.head.rotation.y = wr * 0.5;
+    const legs = this.getLegPositions();
+    m.leftLeg.position.set(-0.3, -0.05, -0.35); m.leftLeg.rotation.x = legs.lAngle;
+    m.rightLeg.position.set(-0.3, -0.05, 0.35); m.rightLeg.rotation.x = legs.rAngle;
+    m.leftFoot.position.set(-0.3 + Math.cos(legs.lAngle) * LEG_LEN * 0.5, -0.05 - Math.sin(legs.lAngle) * LEG_LEN * 0.5, -0.35);
+    m.rightFoot.position.set(-0.3 + Math.cos(legs.rAngle) * LEG_LEN * 0.5, -0.05 - Math.sin(legs.rAngle) * LEG_LEN * 0.5, 0.35);
+    const armSwing = Math.sin(this.wrigglePhase) * 0.4 * Math.min(s2d / 2, 1);
+    m.leftArm.rotation.x = armSwing; m.rightArm.rotation.x = -armSwing;
+    m.body.material.emissive = new THREE.Color(this.buffs.speed > 0 ? 0xffeb3b : 0x000000); m.body.material.emissiveIntensity = this.buffs.speed > 0 ? 0.3 : 0;
+    if (this.buffs.bigKick > 0) { m.leftLeg.material.emissive = new THREE.Color(0xff6d00); m.leftLeg.material.emissiveIntensity = 0.4; m.rightLeg.material.emissive = new THREE.Color(0xff6d00); m.rightLeg.material.emissiveIntensity = 0.4; }
+    else { m.leftLeg.material.emissive = new THREE.Color(0x000000); m.leftLeg.material.emissiveIntensity = 0; m.rightLeg.material.emissive = new THREE.Color(0x000000); m.rightLeg.material.emissiveIntensity = 0; }
+    if (this.invincible > 0) { const blink = Math.sin(Date.now() * 0.01) > 0; m.body.material.emissive = blink ? new THREE.Color(0xffd700) : new THREE.Color(0x000000); m.body.material.emissiveIntensity = blink ? 0.6 : 0; }
+    updateHPBar(this);
+  }
+}
+
+// ===== 创建4个玩家 =====
+const p1Mesh = createPlayer(0x4fc3f7, '1'), p2Mesh = createPlayer(0xef5350, '2');
+const ai1Mesh = createPlayer(0x81d4fa, '3'), ai2Mesh = createPlayer(0xef9a9a, '4');
+// 根据球门位置设置起始点
+const gs1 = goalSegments.find(g => g.team === 1);
+const gs2 = goalSegments.find(g => g.team === 2);
+const p1StartX = gs2 ? -gs2.cx * 0.3 : -6;
+const p1StartZ = gs2 ? -gs2.cz * 0.3 : 0;
+const p2StartX = gs1 ? -gs1.cx * 0.3 : 6;
+const p2StartZ = gs1 ? -gs1.cz * 0.3 : 0;
+const p1 = new PlayerState(p1Mesh, p1StartX, p1StartZ, 1, 0x4fc3f7, 1);
+const p2 = new PlayerState(p2Mesh, p2StartX, p2StartZ, -1, 0xef5350, 2);
+const ai1 = new PlayerState(ai1Mesh, p1StartX * 0.5, p1StartZ + 3, 1, 0x81d4fa, 1, true);
+const ai2 = new PlayerState(ai2Mesh, p2StartX * 0.5, p2StartZ - 3, -1, 0xef9a9a, 2, true);
+const allPlayers = [p1, p2, ai1, ai2];
+
+// ===== 游戏状态 =====
+const gameState = { score: [0, 0], kills: [0, 0], started: false, goalPause: 0, victory: false, winningTeam: 0 };
+
+// ===== 联机状态 =====
+let socket = null;
+let mpMode = 'local'; // 'local', 'host', 'client'
+let mySlot = 0; // 0=P1, 1=P2
+let roomId = '';
+let netState = { players: {} };
+let lastSent = 0;
+const netInput = { p1: {}, p2: {} };
+let localReady = false;
+let netEventQueue = [];
+let netIdCounter = 1;
+function nextNetId() { return 'n' + (netIdCounter++); }
+function queueNetEvent(type, data) { if (mpMode === 'host' && socket) netEventQueue.push({ t: type, ...(data || {}) }); }
+const clientEntityMap = { powerup: new Map(), boss: new Map() };
+let clientFieldReady = false;
+let hostFieldSent = false;
+// ===== 服务器地址配置（保存到 localStorage）=====
+// 在联机面板上点击房间号输入框旁的配置按钮可修改
+const DEFAULT_SERVER = (location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'http://localhost:3000' : location.origin;
+const SERVER_URL = localStorage.getItem('football_server_url') || DEFAULT_SERVER;
+
+function connectSocket() {
+  if (socket) {
+    // 如果 socket 已存在但断开，尝试重新连接
+    if (!socket.connected) {
+      socket.connect();
+    }
+    return;
+  }
+  socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
+  socket.on('connect', () => {
+    document.getElementById('roomStatus').textContent = '已连接到服务器';
+  });
+  socket.on('disconnect', () => {
+    document.getElementById('roomStatus').textContent = '与服务器的连接已断开';
+    // 重置 UI 状态，允许用户重新操作
+    mpMode = 'local';
+    localReady = false;
+    mpPanel.style.display = 'flex';
+    document.getElementById('btnConfirm').disabled = false;
+    document.getElementById('btnConfirm').textContent = '开始游戏';
+    // 注意：不断开 socket 引用，connectSocket() 会通过 socket.connect() 重连
+  });
+  socket.on('errorMsg', (msg) => {
+    document.getElementById('roomStatus').textContent = msg;
+    // 发生错误时重置房间状态，允许用户重新操作
+    mpMode = 'local';
+    localReady = false;
+    document.getElementById('btnConfirm').disabled = false;
+    // 根据当前 pendingAction 恢复按钮文字
+    if (pendingAction === 'create') {
+      document.getElementById('btnConfirm').textContent = '创建房间';
+    } else if (pendingAction === 'join') {
+      document.getElementById('btnConfirm').textContent = '加入房间';
+    } else {
+      document.getElementById('btnConfirm').textContent = '开始游戏';
+    }
+  });
+  socket.on('joinedRoom', ({ slot, isHost }) => {
+    mySlot = slot;
+    mpMode = isHost ? 'host' : 'client';
+    const label = isHost ? '创建' : '加入';
+    const teamLabel = slot === 0 ? 'P1（蓝队）' : 'P2（红队）';
+    document.getElementById('roomStatus').textContent = `已${label}房间 ${roomId}，你是 ${teamLabel}`;
+    // 设置初始按钮文字，roomUpdate 会根据玩家数量更新
+    if (isHost) {
+      document.getElementById('btnConfirm').textContent = '等待玩家加入...';
+      document.getElementById('btnConfirm').disabled = true;
+    } else {
+      document.getElementById('btnConfirm').textContent = '准备';
+      document.getElementById('btnConfirm').disabled = false;
+    }
+  });
+  socket.on('roomUpdate', (players) => {
+    netState.players = players;
+    const count = Object.keys(players).length;
+    if (mpMode === 'host') {
+      if (count >= 2) {
+        document.getElementById('roomStatus').textContent = '玩家已加入，点击开始';
+        document.getElementById('btnConfirm').textContent = '开始游戏';
+        document.getElementById('btnConfirm').disabled = false;
+      } else {
+        document.getElementById('roomStatus').textContent = `已创建房间 ${roomId}，等待另一名玩家加入...`;
+        document.getElementById('btnConfirm').textContent = '等待玩家加入...';
+        document.getElementById('btnConfirm').disabled = true;
+      }
+    } else if (mpMode === 'client') {
+      if (!localReady) {
+        document.getElementById('roomStatus').textContent = count >= 2 ? '房间已满，点击准备' : '等待另一名玩家';
+        document.getElementById('btnConfirm').textContent = '准备';
+        document.getElementById('btnConfirm').disabled = false;
+      }
+    }
+  });
+  socket.on('startGame', () => {
+    gameState.started = true;
+    document.getElementById('multiplayerPanel').style.display = 'none';
+    if (!audioCtx) { initAudio(); }
+    bgMusicOn = soundEnabled;
+  });
+  socket.on('playerDisconnected', (disconnectedId) => {
+    const wasHost = mpMode === 'host';
+    mpMode = 'local';
+    localReady = false;
+    document.getElementById('btnConfirm').disabled = false;
+    // 重新显示联机面板
+    mpPanel.style.display = 'flex';
+    // 如果房主断开，所有人重置；如果玩家断开，房主等待
+    if (wasHost) {
+      document.getElementById('roomStatus').textContent = '房主已断开连接';
+      document.getElementById('btnConfirm').textContent = '开始游戏';
+    } else {
+      document.getElementById('roomStatus').textContent = '对方玩家已断开，返回大厅';
+      document.getElementById('btnConfirm').textContent = '开始游戏';
+    }
+    // 重置游戏状态
+    gameState.started = false;
+    gameState.score = [0, 0];
+    gameState.kills = [0, 0];
+    document.getElementById('s1').textContent = '0';
+    document.getElementById('s2').textContent = '0';
+    document.getElementById('k1').textContent = '0';
+    document.getElementById('k2').textContent = '0';
+  });
+  socket.on('gameState', (data) => applyHostState(data));
+  socket.on('playerInput', ({ id, slot, input }) => {
+    if (mpMode === 'host') {
+      netInput[slot === 0 ? 'p1' : 'p2'] = input || {};
+    }
+  });
+  socket.on('goal', (data) => {
+    if (mpMode === 'client') {
+      gameState.score = data.score;
+      document.getElementById('s1').textContent = gameState.score[0];
+      document.getElementById('s2').textContent = gameState.score[1];
+    }
+  });
+}
+
+function applyHostState(data) {
+  if (!data) return;
+  if (data.field && !clientFieldReady) applyFieldData(data.field);
+  if (data.started !== undefined) gameState.started = data.started;
+  if (data.victory !== undefined) gameState.victory = data.victory;
+  if (data.winningTeam !== undefined) gameState.winningTeam = data.winningTeam;
+  if (data.goalPause !== undefined) gameState.goalPause = data.goalPause;
+  if (data.score) {
+    gameState.score = data.score;
+    document.getElementById('s1').textContent = gameState.score[0];
+    document.getElementById('s2').textContent = gameState.score[1];
+  }
+  if (data.kills) {
+    gameState.kills = data.kills;
+    document.getElementById('k1').textContent = gameState.kills[0];
+    document.getElementById('k2').textContent = gameState.kills[1];
+  }
+  if (gameState.victory) {
+    document.getElementById('victoryOverlay').classList.add('show');
+    document.getElementById('victoryText').innerHTML = `<span class="team${gameState.winningTeam}">队${gameState.winningTeam} 胜利!</span>`;
+    document.getElementById('victorySub').textContent = `${gameState.score[0]} : ${gameState.score[1]}`;
+  } else {
+    document.getElementById('victoryOverlay').classList.remove('show');
+  }
+
+  // 玩家
+  if (data.players) {
+    for (let i = 0; i < data.players.length && i < allPlayers.length; i++) {
+      const s = data.players[i]; const p = allPlayers[i];
+      if (!s || !p) continue;
+      p.x = s.x; p.y = s.y || 0; p.z = s.z;
+      p.vx = s.vx || 0; p.vy = s.vy || 0; p.vz = s.vz || 0;
+      p.mesh.group.position.set(s.x, s.y || 0, s.z);
+      if (s.ry !== undefined) p.mesh.group.rotation.y = s.ry;
+      p.hp = s.hp; p.dead = s.dead;
+      p.invincible = s.invincible || 0;
+      p.respawnTimer = s.respawnTimer || 0;
+      p.heldPowerup = s.heldPowerup || null;
+      p.gunAmmo = s.gunAmmo || 0;
+      p.sniperAmmo = s.sniperAmmo || 0;
+      p.grenadeAmmo = s.grenadeAmmo || 0;
+      p.speedMultiplier = s.speedMult || 1;
+      if (s.buffs) p.buffs = { ...s.buffs };
+      p.mesh.group.visible = !p.dead;
+    }
+  }
+
+  // 球（按索引）
+  if (data.balls) {
+    while (balls.length < data.balls.length) {
+      const idx = balls.length;
+      const sd = data.balls[idx];
+      const r = sd.r || randomBallRadius();
+      const skin = sd.skin || randomBallSkin();
+      const mesh = createBallMesh(r, skin);
+      const state = createBallState();
+      balls.push({ mesh, state, isMain: !!sd.isMain, _radius: r, _skin: skin });
+    }
+    while (balls.length > data.balls.length) { const b = balls.pop(); scene.remove(b.mesh); }
+    for (let i = 0; i < data.balls.length && i < balls.length; i++) {
+      const s = data.balls[i]; const b = balls[i];
+      b.mesh.position.set(s.x, s.y, s.z);
+      b.state.vx = s.vx; b.state.vy = s.vy; b.state.vz = s.vz;
+      b.state.spinX = s.sx; b.state.spinY = s.sy; b.state.spinZ = s.sz;
+    }
+  }
+
+  // 道具（按 id）
+  if (data.powerups) {
+    const seen = new Set();
+    for (const ps of data.powerups) {
+      seen.add(ps.id);
+      let p = clientEntityMap.powerup.get(ps.id);
+      if (!p) {
+        const type = POWERUP_TYPES[ps.type];
+        if (!type) continue;
+        const g = new THREE.Group();
+        g.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5),
+          new THREE.MeshStandardMaterial({ color: type.color, emissive: type.color, emissiveIntensity: 0.5, roughness: 0.3 })));
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.06, 8, 24),
+          new THREE.MeshBasicMaterial({ color: type.color, transparent: true, opacity: 0.6 }));
+        ring.rotation.x = Math.PI / 2; g.add(ring);
+        scene.add(g);
+        p = { group: g, typeKey: ps.type, type, ring, _id: ps.id };
+        clientEntityMap.powerup.set(ps.id, p);
+      }
+      p.group.position.set(ps.x, 0.6 + Math.sin(Date.now() * 0.003) * 0.15, ps.z);
+      p.group.rotation.y += 0.03;
+      p.ring.rotation.z += 0.05;
+    }
+    for (const [id, p] of clientEntityMap.powerup) {
+      if (!seen.has(id)) { scene.remove(p.group); clientEntityMap.powerup.delete(id); }
+    }
+  }
+
+  // 子弹（按索引同步）
+  if (data.bullets) {
+    while (bullets.length < data.bullets.length) {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.08, 4, 4), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
+      scene.add(m); bullets.push({ mesh: m, vx: 0, vz: 0, bounces: 0 });
+    }
+    while (bullets.length > data.bullets.length) { const b = bullets.pop(); scene.remove(b.mesh); }
+    for (let i = 0; i < data.bullets.length; i++) {
+      bullets[i].mesh.position.set(data.bullets[i].x, 0.3, data.bullets[i].z);
+    }
+  }
+  if (data.snipers) {
+    while (sniperRounds.length < data.snipers.length) {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 6), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+      m.rotation.z = Math.PI / 2; scene.add(m); sniperRounds.push({ mesh: m, vx: 0, vz: 0, bounces: 0 });
+    }
+    while (sniperRounds.length > data.snipers.length) { const s = sniperRounds.pop(); scene.remove(s.mesh); }
+    for (let i = 0; i < data.snipers.length; i++) {
+      sniperRounds[i].mesh.position.set(data.snipers[i].x, 0.3, data.snipers[i].z);
+    }
+  }
+  if (data.rockets) {
+    while (rockets.length < data.rockets.length) {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.6, 8), new THREE.MeshStandardMaterial({ color: 0xff1744, emissive: 0xff1744, emissiveIntensity: 0.6 }));
+      m.rotation.z = Math.PI / 2; scene.add(m); rockets.push({ mesh: m, vx: 0, vz: 0, bounces: 0 });
+    }
+    while (rockets.length > data.rockets.length) { const r = rockets.pop(); scene.remove(r.mesh); }
+    for (let i = 0; i < data.rockets.length; i++) {
+      rockets[i].mesh.position.set(data.rockets[i].x, 0.3, data.rockets[i].z);
+    }
+  }
+  if (data.grenades) {
+    while (grenades.length < data.grenades.length) {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), new THREE.MeshStandardMaterial({ color: 0x795548, roughness: 0.8 }));
+      scene.add(m); grenades.push({ mesh: m, vx: 0, vy: 0, vz: 0, bounces: 0 });
+    }
+    while (grenades.length > data.grenades.length) { const g = grenades.pop(); scene.remove(g.mesh); }
+    for (let i = 0; i < data.grenades.length; i++) {
+      grenades[i].mesh.position.set(data.grenades[i].x, data.grenades[i].y, data.grenades[i].z);
+    }
+  }
+
+  // Boss（按 id）
+  if (data.bosses) {
+    const seenBoss = new Set();
+    for (const bs of data.bosses) {
+      seenBoss.add(bs.id);
+      let boss = clientEntityMap.boss.get(bs.id);
+      if (!boss) {
+        const mesh = createBossMesh();
+        boss = { mesh, x: bs.x, z: bs.z, y: 0, vx: 0, vz: 0, hp: bs.hp, dead: false, _id: bs.id };
+        clientEntityMap.boss.set(bs.id, boss);
+      }
+      boss.x = bs.x; boss.z = bs.z; boss.hp = bs.hp; boss.vx = bs.vx || 0; boss.vz = bs.vz || 0;
+      boss.mesh.group.position.set(boss.x, 0, boss.z);
+      const s2d = Math.sqrt(boss.vx * boss.vx + boss.vz * boss.vz);
+      if (s2d > 0.3) boss.mesh.group.rotation.y = -Math.atan2(boss.vz, boss.vx) + Math.PI / 2;
+      updateBossHP(boss);
+    }
+    for (const [id, boss] of clientEntityMap.boss) {
+      if (!seenBoss.has(id)) { scene.remove(boss.mesh.group); clientEntityMap.boss.delete(id); }
+    }
+  }
+
+  // 事件
+  if (data.events) {
+    for (const ev of data.events) handleNetEvent(ev);
+  }
+}
+
+function handleNetEvent(ev) {
+  switch (ev.t) {
+    case 'goal': {
+      const name = ev.touch === 0 ? 'P1' : ev.touch === 1 ? 'P2' : ev.touch === 2 ? 'AI1' : ev.touch === 3 ? 'AI2' : '';
+      const msg = document.getElementById('goalMsg');
+      msg.textContent = name ? `⚽ ${name} 进球! 队${ev.team}得分!` : `⚽ 队${ev.team}得分!`;
+      msg.classList.add('show'); setTimeout(() => msg.classList.remove('show'), 2000);
+      sndGoal();
+      break;
+    }
+    case 'kill':
+      createExplosion(ev.x, ev.z); sndKill(); showPowerupMsg('💀 击杀!', 0xff0000);
+      break;
+    case 'powerup_msg':
+      showPowerupMsg(ev.text, ev.color);
+      break;
+    case 'boss_spawn':
+      showPowerupMsg('👹 BOSS降临!', 0xff0000); sndNuke();
+      break;
+    case 'boss_die':
+      showPowerupMsg('💀 BOSS被击败!', 0xffcc00); sndNuke();
+      break;
+    case 'victory':
+      sndGoal(); setTimeout(sndGoal, 300); setTimeout(sndGoal, 600);
+      for (let i = 0; i < 10; i++) setTimeout(() => spawnFirework(), i * 400);
+      break;
+    case 'restart':
+      restartGame();
+      break;
+  }
+}
+
+function serializeGameState() {
+  return {
+    started: gameState.started,
+    score: gameState.score,
+    kills: gameState.kills,
+    victory: gameState.victory,
+    winningTeam: gameState.winningTeam,
+    goalPause: gameState.goalPause,
+    players: allPlayers.map(p => ({
+      x: p.x, y: p.y, z: p.z,
+      ry: p.mesh.group.rotation.y, hp: p.hp, dead: p.dead, invincible: p.invincible,
+      respawnTimer: p.respawnTimer,
+      vx: p.vx, vy: p.vy, vz: p.vz,
+      heldPowerup: p.heldPowerup,
+      gunAmmo: p.gunAmmo, sniperAmmo: p.sniperAmmo, grenadeAmmo: p.grenadeAmmo,
+      speedMult: p.speedMultiplier,
+      buffs: { ...p.buffs }
+    })),
+    balls: balls.map(b => ({
+      x: b.mesh.position.x, y: b.mesh.position.y, z: b.mesh.position.z,
+      vx: b.state.vx, vy: b.state.vy, vz: b.state.vz,
+      sx: b.state.spinX, sy: b.state.spinY, sz: b.state.spinZ,
+      r: b._radius, skin: b._skin, isMain: !!b.isMain
+    })),
+    powerups: powerups.map(p => ({ id: p._id, type: p.typeKey, x: p.group.position.x, z: p.group.position.z })),
+    bullets: bullets.map(b => ({ x: b.mesh.position.x, z: b.mesh.position.z, vx: b.vx, vz: b.vz, isBoss: !!b.isBoss })),
+    snipers: sniperRounds.map(s => ({ x: s.mesh.position.x, z: s.mesh.position.z, vx: s.vx, vz: s.vz, isBoss: !!s.isBoss })),
+    rockets: rockets.map(r => ({ x: r.mesh.position.x, z: r.mesh.position.z, vx: r.vx, vz: r.vz, isBoss: !!r.isBoss })),
+    grenades: grenades.map(g => ({ x: g.mesh.position.x, y: g.mesh.position.y, z: g.mesh.position.z, vx: g.vx, vy: g.vy, vz: g.vz, isBoss: !!g.isBoss })),
+    bosses: bosses.map(b => ({ id: b._id, x: b.x, z: b.z, hp: b.hp, dead: b.dead, vx: b.vx, vz: b.vz, facing: b.facing })),
+    field: hostFieldSent ? undefined : (() => { hostFieldSent = true; return {
+      numSides: NUM_SIDES,
+      verts: fieldVerts.map(v => ({ x: v.x, z: v.z })),
+      goals: goalSegments.map(gs => ({ edgeIdx: gs.edgeIdx, t1: gs.t1, t2: gs.t2, team: gs.team, cx: gs.cx, cz: gs.cz, onx: gs.onx, onz: gs.onz })),
+      mainBallSkin: balls[0]?._skin || 'football'
+    }; })(),
+    events: netEventQueue.splice(0)
+  };
+}
+
+function collectInput(prefix) {
+  const map = prefix === 'p1' ? {
+    left: 'a', right: 'd', up: 'w', down: 's', legL: 'j', legR: 'k',
+    use: ' ', gun: 'e', sniper: 'q', grenade: 'r'
+  } : {
+    left: 'arrowleft', right: 'arrowright', up: 'arrowup', down: 'arrowdown',
+    legL: '1', legR: '2', use: '/', gun: '.', sniper: ',', grenade: '0'
+  };
+  const out = {};
+  for (const k in map) out[k] = !!keys[map[k]];
+  return out;
+}
+
+function applyRemoteInput(p, input, dt) {
+  if (!input || p.dead || p.buffs.frozen > 0) return;
+  if (p._grenadeCooldown > 0) p._grenadeCooldown -= dt;
+  // 移动
+  const speed = MOVE_SPEED * p.speedMultiplier;
+  if (input.left) p.vx -= speed * dt;
+  if (input.right) p.vx += speed * dt;
+  if (input.up) p.vz -= speed * dt;
+  if (input.down) p.vz += speed * dt;
+  // 朝向
+  if (Math.abs(p.vx) > 0.5 || Math.abs(p.vz) > 0.5) {
+    p.facing = p.vx > 0 ? 1 : -1;
+  }
+  // 腿
+  if (input.legL && p.leftTimer <= 0) { p.leftLeg = 1; p.leftTimer = 0.3; }
+  if (input.legR && p.rightTimer <= 0) { p.rightLeg = 1; p.rightTimer = 0.3; }
+  // 腿收回
+  if (p.leftTimer > 0) { p.leftTimer -= dt; if (p.leftTimer <= 0) { p.leftLeg = -1; setTimeout(() => { if (p.leftLeg === -1) p.leftLeg = 0; }, 100); } }
+  if (p.rightTimer > 0) { p.rightTimer -= dt; if (p.rightTimer <= 0) { p.rightLeg = -1; setTimeout(() => { if (p.rightLeg === -1) p.rightLeg = 0; }, 100); } }
+  // 道具拾取
+  checkPowerupPickup(p);
+  // 道具使用
+  if (input.use && p.heldPowerup) { activatePowerup(p, p.heldPowerup); p.heldPowerup = null; }
+  // 武器
+  if (input.gun && p.gunAmmo > 0) { p.gunFireTimer -= dt; if (p.gunFireTimer <= 0) { fireBullet(p); p.gunFireTimer = 0.12; } }
+  if (input.sniper && p.sniperAmmo > 0 && !p._sniperFired) { fireSniper(p); p._sniperFired = true; }
+  if (!input.sniper) p._sniperFired = false;
+  if (input.grenade) activateGrenade(p);
+}
+
+// 联机 UI 事件
+const mpPanel = document.getElementById('multiplayerPanel');
+const roomInput = document.getElementById('roomInput');
+const roomStatus = document.getElementById('roomStatus');
+let pendingAction = 'local';
+
+document.getElementById('btnLocal').onclick = () => {
+  pendingAction = 'local';
+  roomStatus.textContent = '本地模式：P1 用 WASD，P2 用方向键';
+  document.getElementById('btnConfirm').textContent = '开始游戏';
+};
+document.getElementById('btnCreate').onclick = () => {
+  pendingAction = 'create';
+  roomStatus.textContent = '输入房间号后点击确认创建';
+  document.getElementById('btnConfirm').textContent = '创建房间';
+};
+document.getElementById('btnJoin').onclick = () => {
+  pendingAction = 'join';
+  roomStatus.textContent = '输入房间号后点击确认加入';
+  document.getElementById('btnConfirm').textContent = '加入房间';
+};
+
+// ===== 服务器地址配置（localStorage 持久化）=====
+const btnServerCfg = document.getElementById('btnServerCfg');
+const serverCfgPanel = document.getElementById('serverCfgPanel');
+const serverUrlInput = document.getElementById('serverUrlInput');
+const btnSaveServer = document.getElementById('btnSaveServer');
+const btnResetServer = document.getElementById('btnResetServer');
+
+// 初始化输入框显示当前地址
+serverUrlInput.value = SERVER_URL === DEFAULT_SERVER ? '' : SERVER_URL;
+serverUrlInput.placeholder = `服务器地址（默认：${DEFAULT_SERVER}）`;
+
+btnServerCfg.onclick = () => {
+  serverCfgPanel.style.display = serverCfgPanel.style.display === 'none' ? 'block' : 'none';
+};
+
+btnSaveServer.onclick = () => {
+  const url = serverUrlInput.value.trim();
+  if (url) {
+    localStorage.setItem('football_server_url', url);
+    localStorage.setItem('football_chat_server_url', url);
+    roomStatus.textContent = `服务器地址已保存：${url}，刷新页面生效`;
+    // 自动刷新使新地址生效
+    setTimeout(() => location.reload(), 800);
+  } else {
+    btnResetServer.click();
+  }
+};
+
+btnResetServer.onclick = () => {
+  localStorage.removeItem('football_server_url');
+  localStorage.removeItem('football_chat_server_url');
+  serverUrlInput.value = '';
+  roomStatus.textContent = '已恢复默认地址，刷新页面生效';
+  setTimeout(() => location.reload(), 500);
+};
+document.getElementById('btnConfirm').onclick = () => {
+  // 优先处理已加入房间后的操作（基于 mpMode 状态）
+  if (mpMode === 'host') {
+    const count = Object.keys(netState.players).length;
+    if (count >= 2) {
+      // 房主：两名玩家已到位，开始游戏
+      hostFieldSent = false;
+      socket.emit('startGameByHost');
+      gameState.started = true;
+      mpPanel.style.display = 'none';
+      if (!audioCtx) { initAudio(); }
+      bgMusicOn = soundEnabled;
+    } else {
+      roomStatus.textContent = '等待另一名玩家加入...';
+    }
+    return;
+  }
+  if (mpMode === 'client') {
+    if (!localReady) {
+      localReady = true;
+      socket.emit('ready');
+      document.getElementById('btnConfirm').textContent = '已准备';
+      roomStatus.textContent = '已准备，等待房主开始';
+    }
+    return;
+  }
+  // 初始状态：pendingAction 决定是本地/创建/加入
+  roomId = roomInput.value.trim();
+  if (!roomId && pendingAction !== 'local') { roomStatus.textContent = '请输入房间号'; return; }
+  if (pendingAction === 'local') {
+    mpMode = 'local';
+    gameState.started = true;
+    mpPanel.style.display = 'none';
+    if (!audioCtx) { initAudio(); }
+    bgMusicOn = soundEnabled;
+  } else if (pendingAction === 'create') {
+    if (!socket) connectSocket();
+    if (!socket.connected) {
+      socket.once('connect', () => socket.emit('createRoom', { roomId, playerName: '房主' }));
+    } else {
+      socket.emit('createRoom', { roomId, playerName: '房主' });
+    }
+  } else if (pendingAction === 'join') {
+    if (!socket) connectSocket();
+    if (!socket.connected) {
+      socket.once('connect', () => socket.emit('joinRoom', { roomId, playerName: '玩家' }));
+    } else {
+      socket.emit('joinRoom', { roomId, playerName: '玩家' });
+    }
+  }
+};
+
+// ===== 音效 =====
+let audioCtx;
+let soundEnabled = localStorage.getItem('football_sound') !== 'false'; // 默认开启
+function initAudio() { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+function playTone(freq, dur, type = 'sine', vol = 0.15) {
+  if (!audioCtx || !soundEnabled) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = type; o.frequency.value = freq; g.gain.setValueAtTime(vol, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + dur);
+}
+function sndKick() { playTone(120, 0.08, 'sine', 0.2); }
+function sndGoal() { playTone(523, 0.15, 'sine', 0.2); setTimeout(() => playTone(659, 0.15, 'sine', 0.2), 150); setTimeout(() => playTone(784, 0.3, 'sine', 0.2), 300); }
+function sndKill() { playTone(200, 0.15, 'square', 0.1); }
+function sndBomb() { playTone(80, 0.3, 'sine', 0.2); playTone(60, 0.4, 'sawtooth', 0.1); }
+function sndPickup() { playTone(880, 0.08, 'sine', 0.1); setTimeout(() => playTone(1100, 0.08, 'sine', 0.1), 80); }
+function sndGun() { playTone(400, 0.05, 'square', 0.08); }
+function sndSniper() { playTone(800, 0.1, 'sawtooth', 0.12); }
+function sndZap() { playTone(2000, 0.15, 'sawtooth', 0.1); }
+function sndNuke() { playTone(40, 0.8, 'sine', 0.3); playTone(60, 1.0, 'sawtooth', 0.15); }
+
+// ===== 背景音乐（激烈版）=====
+let bgMusicOn = false, bgBeatIdx = 0, bgBeatTimer = 0;
+const BG_BPM = 200;
+const BG_BEAT_LEN = 60 / BG_BPM;
+// 16拍循环模式 - 更密集激烈
+const kickPattern  = [1,1,0,1, 1,0,1,1, 1,1,0,1, 1,0,1,1];
+const snarePattern = [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,1,1,0];
+const hhPattern    = [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1];
+const bassNotes    = [55,55,65,55, 82,73,55,65, 55,55,82,55, 98,82,73,65];
+const leadNotes    = [440,0,523,0, 659,0,523,440, 0,659,0,784, 880,659,523,440];
+const leadNotes2   = [0,330,0,392, 0,523,0,392, 330,0,392,0, 523,440,392,330];
+function updateBGMusic(dt) {
+  if (!bgMusicOn || !audioCtx) return;
+  bgBeatTimer -= dt;
+  if (bgBeatTimer <= 0) {
+    const i = bgBeatIdx % 16;
+    // 底鼓 - 更重
+    if (kickPattern[i]) { playTone(45, 0.12, 'sine', 0.2); playTone(30, 0.08, 'sine', 0.15); }
+    // 军鼓 - 更猛
+    if (snarePattern[i]) { playTone(250, 0.05, 'triangle', 0.12); playTone(1200, 0.03, 'square', 0.06); playTone(6000, 0.02, 'square', 0.04); }
+    // Hi-hat - 更密
+    if (hhPattern[i]) playTone(10000, 0.015, 'square', 0.03);
+    // 贝斯线 - 更深
+    if (bassNotes[i]) playTone(bassNotes[i], 0.12, 'sawtooth', 0.1);
+    // 旋律线1
+    if (leadNotes[i]) playTone(leadNotes[i], 0.1, 'square', 0.04);
+    // 旋律线2
+    if (leadNotes2[i]) playTone(leadNotes2[i], 0.08, 'sawtooth', 0.03);
+    bgBeatIdx++;
+    bgBeatTimer = BG_BEAT_LEN;
+  }
+}
+
+// ===== 音乐开关按钮（控制所有音效+背景音乐）=====
+const musicBtn = document.getElementById('musicBtn');
+const musicIcon = document.getElementById('musicIcon');
+// 根据保存的状态初始化按钮外观
+if (!soundEnabled) {
+  musicIcon.textContent = '🔇';
+  musicBtn.classList.add('muted');
+  bgMusicOn = false;
+}
+musicBtn.addEventListener('click', () => {
+  // 确保音频上下文已初始化
+  if (!audioCtx) { initAudio(); }
+  if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume(); }
+  soundEnabled = !soundEnabled;
+  bgMusicOn = soundEnabled; // 背景音乐跟随总开关
+  localStorage.setItem('football_sound', soundEnabled);
+  if (soundEnabled) {
+    musicIcon.textContent = '🎵';
+    musicBtn.classList.remove('muted');
+    // 重置节拍指针让音乐从头开始
+    bgBeatIdx = 0;
+    bgBeatTimer = 0;
+  } else {
+    musicIcon.textContent = '🔇';
+    musicBtn.classList.add('muted');
+  }
+});
+
+// ===== 输入 =====
+const keys = {};
+document.addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key.toLowerCase() === 'p' && gameState.victory) restartGame();
+});
+document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+// 开始提示由联机面板替代，不自动初始化音频（需用户选择模式后触发）
+document.getElementById('startMsg').style.display = 'none';
+
+// ===== 进球检测 =====
+function goal(team, scoringBall) {
+  gameState.score[team - 1]++;
+  document.getElementById('s1').textContent = gameState.score[0];
+  document.getElementById('s2').textContent = gameState.score[1];
+  const msg = document.getElementById('goalMsg');
+  const lastTouch = scoringBall.state.lastTouch;
+  const touchIdx = lastTouch ? allPlayers.indexOf(lastTouch) : -1;
+  const scorerName = touchIdx === 0 ? 'P1' : touchIdx === 1 ? 'P2' : touchIdx === 2 ? 'AI1' : touchIdx === 3 ? 'AI2' : '';
+  msg.textContent = lastTouch ? `⚽ ${scorerName} 进球! 队${team}得分!` : `⚽ 队${team}得分!`;
+  msg.classList.add('show'); setTimeout(() => msg.classList.remove('show'), 2000);
+  sndGoal(); gameState.goalPause = 1.0;
+  queueNetEvent('goal', { team, touch: touchIdx });
+  resetBall(scoringBall);
+  if (gameState.score[team - 1] >= WIN_SCORE) showVictory(team);
+}
+
+function checkBallGoal(ball) {
+  const br = ball._radius;
+  for (const gs of goalSegments) {
+    const edge = fieldEdges[gs.edgeIdx];
+    const sd = signedDistToEdge(ball.mesh.position.x, ball.mesh.position.z, edge);
+    if (sd < br) {
+      const t = projectOnEdge(ball.mesh.position.x, ball.mesh.position.z, edge);
+      if (t >= gs.t1 && t <= gs.t2 && ball.mesh.position.y < GOAL_H) {
+        goal(gs.team, ball); return true;
+      }
+    }
+  }
+  return false;
+}
+
+// ===== 胜利 =====
+const fireworks = [];
+function showVictory(team) {
+  gameState.victory = true; gameState.winningTeam = team;
+  const ov = document.getElementById('victoryOverlay');
+  document.getElementById('victoryText').innerHTML = `<span class="team${team}">队${team} 胜利!</span>`;
+  document.getElementById('victorySub').textContent = `${gameState.score[0]} : ${gameState.score[1]}`;
+  ov.classList.add('show');
+  sndGoal(); setTimeout(sndGoal, 300); setTimeout(sndGoal, 600);
+  for (let i = 0; i < 10; i++) setTimeout(() => spawnFirework(), i * 400);
+  queueNetEvent('victory', { team });
+}
+function spawnFirework() {
+  const x = (Math.random() - 0.5) * 20, z = (Math.random() - 0.5) * 20;
+  const colors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xff8800];
+  for (let i = 0; i < 30; i++) {
+    const c = colors[Math.floor(Math.random() * colors.length)];
+    const p = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), new THREE.MeshBasicMaterial({ color: c }));
+    p.position.set(x, 5 + Math.random() * 5, z); scene.add(p);
+    const a = Math.random() * Math.PI * 2, elev = Math.random() * Math.PI * 0.8, s = 5 + Math.random() * 8;
+    fireworks.push({ mesh: p, vx: Math.cos(a) * Math.cos(elev) * s, vy: Math.sin(elev) * s + 3, vz: Math.sin(a) * Math.cos(elev) * s, life: 1.5 + Math.random() });
+  }
+}
+function updateFireworks(dt) {
+  for (let i = fireworks.length - 1; i >= 0; i--) {
+    const f = fireworks[i]; f.life -= dt;
+    if (f.life <= 0) { scene.remove(f.mesh); fireworks.splice(i, 1); continue; }
+    f.vy -= 8 * dt; f.mesh.position.x += f.vx * dt; f.mesh.position.y += f.vy * dt; f.mesh.position.z += f.vz * dt;
+    f.mesh.scale.setScalar(Math.min(f.life, 1));
+  }
+}
+function restartGame() {
+  gameState.score = [0, 0]; gameState.kills = [0, 0]; gameState.victory = false; gameState.winningTeam = 0; gameState.goalPause = 0;
+  document.getElementById('s1').textContent = '0'; document.getElementById('s2').textContent = '0';
+  document.getElementById('victoryOverlay').classList.remove('show');
+  for (const p of allPlayers) { p.dead = false; p.hp = MAX_HP; p.invincible = 0; p.heldPowerup = null; p.buffs = { speed: 0, frozen: 0, bigKick: 0, magnet: 0, shield: 0 }; p.speedMultiplier = 1.0; p.gunAmmo = 0; p.sniperAmmo = 0; p.grenadeAmmo = 99999999999; p.reset(); p.mesh.group.visible = true; }
+  for (const b of balls) resetBall(b);
+  for (const f of fireworks) scene.remove(f.mesh); fireworks.length = 0;
+  for (const b of bosses) scene.remove(b.mesh.group); bosses.length = 0;
+  for (const p of allPlayers) { removeFreezeEffect(p); removeShieldEffect(p); }
+  queueNetEvent('restart', {});
+}
+
+// ===== Buff栏UI =====
+function updateBuffBar() {
+  for (let t = 0; t < 2; t++) {
+    const players = allPlayers.filter(p => p.team === t + 1);
+    const el = document.getElementById(t === 0 ? 'buffLeft' : 'buffRight');
+    let html = `<div class="buff-label" style="color:${t === 0 ? '#4fc3f7' : '#ef5350'}">队${t + 1}</div>`;
+    for (const p of players) {
+      const name = p === p1 ? 'P1' : p === p2 ? 'P2' : p === ai1 ? 'AI1' : 'AI2';
+      html += '<div class="buff-row">';
+      if (p.heldPowerup) { const pt = POWERUP_TYPES[p.heldPowerup]; html += `<div class="buff-icon" style="border:1px solid #fff"><span>${pt.icon}</span></div>`; }
+      if (p.gunAmmo > 0) html += `<div class="buff-icon" style="background:rgba(96,125,139,0.7)"><span>🔫</span><span class="ammo-count">${p.gunAmmo}</span></div>`;
+      if (p.sniperAmmo > 0) html += `<div class="buff-icon" style="background:rgba(38,50,56,0.7)"><span>🎯</span><span class="ammo-count">${p.sniperAmmo}</span></div>`;
+      if (p.grenadeAmmo > 0) html += `<div class="buff-icon" style="background:rgba(121,85,72,0.7)"><span>🎗️</span><span class="ammo-count">${p.grenadeAmmo}</span></div>`;
+      for (const [key, val] of Object.entries(p.buffs)) { if (val > 0) { const pt = POWERUP_TYPES[key]; if (pt) html += `<div class="buff-icon"><span>${pt.icon}</span><div class="fill" style="height:${(val / pt.duration) * 100}%"></div></div>`; } }
+      html += '</div>';
+    }
+    el.innerHTML = html;
+  }
+}
+
+// ===== 球物理 =====
+function updateBallPhysics(ball, dt) {
+  const br = ball._radius;
+  const s = ball.state;
+  s.vy += GRAVITY * dt;
+  s.vx *= BALL_FRIC; s.vz *= BALL_FRIC;
+  if (ball.mesh.position.y <= br + 0.05) { s.vx *= BALL_GROUND_FRIC; s.vz *= BALL_GROUND_FRIC; }
+  ball.mesh.position.x += s.vx * dt; ball.mesh.position.y += s.vy * dt; ball.mesh.position.z += s.vz * dt;
+  if (ball.mesh.position.y < br) { ball.mesh.position.y = br; if (s.vy < -0.5) s.vy *= -0.5; else s.vy = 0; }
+  s.vx += s.spinZ * MAGNUS_FACTOR * dt; s.vz -= s.spinX * MAGNUS_FACTOR * dt;
+  s.spinX *= 0.995; s.spinY *= 0.995; s.spinZ *= 0.995;
+  ball.mesh.rotation.x += s.spinX * dt; ball.mesh.rotation.y += s.spinY * dt; ball.mesh.rotation.z += s.spinZ * dt;
+  for (const e of fieldEdges) {
+    const sd = signedDistToEdge(ball.mesh.position.x, ball.mesh.position.z, e);
+    if (sd < br) {
+      const ei = fieldEdges.indexOf(e);
+      let scored = false;
+      for (const gs of goalSegments) {
+        if (gs.edgeIdx !== ei) continue;
+        const t = projectOnEdge(ball.mesh.position.x, ball.mesh.position.z, e);
+        if (t >= gs.t1 && t <= gs.t2 && ball.mesh.position.y < GOAL_H) { goal(gs.team, ball); scored = true; return; }
+      }
+      if (scored) return;
+      // 球在球门开口范围内但高度超过横梁，也允许穿过不反弹
+      let inGoalWidth = false;
+      for (const gs of goalSegments) {
+        if (gs.edgeIdx !== ei) continue;
+        const t = projectOnEdge(ball.mesh.position.x, ball.mesh.position.z, e);
+        if (t >= gs.t1 && t <= gs.t2) { inGoalWidth = true; break; }
+      }
+      if (inGoalWidth) continue; // 球在球门宽度内，让球飞出，不反弹
+      const dot = s.vx * e.nx + s.vz * e.nz;
+      s.vx -= 2 * dot * e.nx; s.vz -= 2 * dot * e.nz;
+      ball.mesh.position.x += e.nx * (br - sd); ball.mesh.position.z += e.nz * (br - sd);
+      s.spinX += (Math.random() - 0.5) * 2; s.spinZ += (Math.random() - 0.5) * 2;
+      break;
+    }
+  }
+  const spd = Math.sqrt(s.vx * s.vx + s.vz * s.vz);
+  if (spd < 0.3) s.stuckTimer += dt; else s.stuckTimer = 0;
+  if (s.stuckTimer > 4) { s.vx += (Math.random() - 0.5) * 5; s.vz += (Math.random() - 0.5) * 5; s.stuckTimer = 0; }
+}
+
+// ===== 主循环 =====
+let lastTime = 0;
+function animate(time) {
+  requestAnimationFrame(animate);
+  const dt = Math.min((time - lastTime) / 1000, 0.05); lastTime = time;
+
+  // 客机模式：只发送输入、更新纯视觉特效、按主机数据渲染
+  if (mpMode === 'client') {
+    if (gameState.started && !gameState.victory) {
+      const myInput = collectInput(mySlot === 0 ? 'p1' : 'p2');
+      if (socket && socket.connected) {
+        socket.emit('playerInput', { slot: mySlot, input: myInput });
+      }
+    }
+    updateZapBeams(dt); updateExplosions(dt); updateFireworks(dt);
+    updateAimLines();
+    for (const p of allPlayers) p.updateMesh();
+    updateRespawnUI(); updateBuffBar();
+    if (nukeFlash) { nukeFlash.life -= dt; if (nukeFlash.life <= 0) nukeFlash = null; }
+    renderer.render(scene, camera);
+    return;
+  }
+
+  if (!gameState.started || gameState.victory) { renderer.render(scene, camera); return; }
+  if (gameState.goalPause > 0) { gameState.goalPause -= dt; renderer.render(scene, camera); return; }
+
+  // 本地或主机模式
+  if (mpMode === 'host') {
+    p1.update(dt, 'a', 'd', 'w', 's', 'j', 'k');
+    // P2：先把客机输入写入速度/武器，再走与本地相同的物理更新
+    applyRemoteInput(p2, netInput.p2, dt);
+    p2.physUpdate(dt);
+  } else {
+    p1.update(dt, 'a', 'd', 'w', 's', 'j', 'k');
+    p2.update(dt, 'arrowleft', 'arrowright', 'arrowup', 'arrowdown', '1', '2');
+  }
+  ai1.update(dt); ai2.update(dt);
+
+  if (!p1.dead && keys[' '] && p1.heldPowerup) { activatePowerup(p1, p1.heldPowerup); p1.heldPowerup = null; }
+  if (!p1.dead && keys['e'] && p1.gunAmmo > 0) { p1.gunFireTimer -= dt; if (p1.gunFireTimer <= 0) { fireBullet(p1); p1.gunFireTimer = 0.12; } }
+  if (!p1.dead && keys['q'] && p1.sniperAmmo > 0 && !p1._sniperFired) { fireSniper(p1); p1._sniperFired = true; }
+  if (!keys['q']) p1._sniperFired = false;
+  if (!p1.dead && keys['r']) activateGrenade(p1);
+
+  if (mpMode === 'local') {
+    if (!p2.dead && keys['/'] && p2.heldPowerup) { activatePowerup(p2, p2.heldPowerup); p2.heldPowerup = null; }
+    if (!p2.dead && keys['.'] && p2.gunAmmo > 0) { p2.gunFireTimer -= dt; if (p2.gunFireTimer <= 0) { fireBullet(p2); p2.gunFireTimer = 0.12; } }
+    if (!p2.dead && keys[','] && p2.sniperAmmo > 0 && !p2._sniperFired) { fireSniper(p2); p2._sniperFired = true; }
+    if (!keys[',']) p2._sniperFired = false;
+    if (!p2.dead && keys['0']) activateGrenade(p2);
+  }
+
+  for (let i = balls.length - 1; i >= 0; i--) {
+    const ball = balls[i];
+    updateBallPhysics(ball, dt);
+    for (const p of allPlayers) { if (!p.dead) { p.pushBall(ball.state, ball); p.kickBall(ball.state, ball); } }
+  }
+  for (let i = 0; i < allPlayers.length; i++) for (let j = i + 1; j < allPlayers.length; j++) allPlayers[i].collidePlayer(allPlayers[j]);
+  updateBullets(dt); updateSniperRounds(dt); updateRockets(dt); updateGrenades(dt);
+  updateZapBeams(dt); updateExplosions(dt); updateFireworks(dt); updateBosses(dt);
+  updatePowerups(dt); updateBuffs(dt); updateDead(dt);
+  updateAimLines(); updateBGMusic(dt);
+  for (const p of allPlayers) p.updateMesh();
+  updateRespawnUI(); updateBuffBar();
+  if (nukeFlash) { nukeFlash.life -= dt; if (nukeFlash.life <= 0) nukeFlash = null; }
+
+  // 主机广播状态
+  if (mpMode === 'host' && socket && socket.connected) {
+    const now = performance.now();
+    const interval = Object.keys(netState.players).length >= 2 ? 50 : 500;
+    if (now - lastSent > interval) {
+      socket.emit('gameState', serializeGameState());
+      lastSent = now;
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(animate);
+
+// 调试/测试暴露
+window.gameDebug = {
+  get mpMode() { return mpMode; },
+  get mySlot() { return mySlot; },
+  get gameState() { return gameState; },
+  get allPlayers() { return allPlayers; },
+  get socket() { return socket; },
+  get balls() { return balls; }
+};
+</script>
+
+<!-- 连接状态 -->
+<div id="connStatus">● 未连接</div>
+<!-- 右上角音乐开关 -->
+<button id="musicBtn" title="音乐开关">
+  <span id="musicIcon">🎵</span>
+  <span class="wave">♪ ♪</span>
+</button>
+
+<!-- 登录/注册界面 -->
+<div id="loginOverlay">
+  <div class="login-box">
+    <h2>⚽ 躺平足球3D - 社区</h2>
+    <div class="tab-bar">
+      <button id="loginTab" class="active" onclick="window.__chatSwitchTab('login')">登录</button>
+      <button id="registerTab" onclick="window.__chatSwitchTab('register')">注册</button>
+    </div>
+    <!-- 登录面板 -->
+    <div id="loginForm">
+      <div class="form-group"><label>昵称</label><input id="loginNick" type="text" placeholder="输入昵称" autocomplete="username" /></div>
+      <div class="form-group"><label>密码</label><input id="loginPass" type="password" placeholder="输入密码" autocomplete="current-password" /></div>
+      <div class="forgot-link"><a onclick="window.__chatShowForgot()">忘记密码？</a></div>
+      <button class="submit-btn" onclick="window.__chatLogin()">登 录</button>
+    </div>
+    <!-- 注册面板 -->
+    <div id="registerForm" style="display:none">
+      <div class="form-group"><label>昵称（唯一）</label><input id="regNick" type="text" placeholder="设置你的昵称" autocomplete="off" /></div>
+      <div class="form-group"><label>密码</label><input id="regPass" type="password" placeholder="设置密码" autocomplete="new-password" /></div>
+      <div class="form-group">
+        <label>邮箱</label>
+        <div class="verify-row">
+          <input id="regEmail" type="email" placeholder="输入邮箱地址" autocomplete="off" />
+          <button class="verify-btn" id="regVerifyBtn" onclick="window.__chatSendRegCode()">获取验证码</button>
+        </div>
+      </div>
+      <div class="form-group"><label>验证码</label><input id="regCode" type="text" placeholder="6位验证码" maxlength="6" autocomplete="off" /></div>
+      <button class="submit-btn" onclick="window.__chatRegister()">注 册</button>
+    </div>
+    <!-- 找回密码面板 -->
+    <div id="forgotForm" style="display:none">
+      <div class="form-group"><label>注册邮箱</label><input id="forgotEmail" type="email" placeholder="输入注册时的邮箱" autocomplete="off" /></div>
+      <div class="form-group">
+        <label>验证码</label>
+        <div class="verify-row">
+          <input id="forgotCode" type="text" placeholder="6位验证码" maxlength="6" />
+          <button class="verify-btn" id="forgotVerifyBtn" onclick="window.__chatSendForgotCode()">获取验证码</button>
+        </div>
+      </div>
+      <div class="form-group"><label>新密码</label><input id="forgotNewPass" type="password" placeholder="设置新密码" autocomplete="new-password" /></div>
+      <button class="submit-btn" onclick="window.__chatResetPassword()">确认重置</button>
+      <div class="back-link"><a onclick="window.__chatSwitchTab('login')">← 返回登录</a></div>
+    </div>
+    <div class="login-error" id="loginError"></div>
+    <div class="login-status" id="loginStatus"></div>
+    <button class="skip-btn" onclick="window.__chatSkip()">跳过，先玩游戏</button>
+  </div>
+</div>
+
+<!-- 好友通知弹窗 -->
+<div id="friendNotifPopup"></div>
+
+<!-- 聊天面板 -->
+<div id="chatPanel" style="display:none">
+  <div id="chatToggle" onclick="window.__chatToggle()">
+    <span>💬 聊天 <span class="badge" id="chatBadge">0</span></span>
+    <span id="chatArrow">▼</span>
+  </div>
+  <div id="chatBody">
+    <div class="chat-tabs">
+      <button id="worldTab" class="active" onclick="window.__chatSwitchChat('world')">世界聊天</button>
+      <button id="privateTab" onclick="window.__chatSwitchChat('private')">私聊</button>
+    </div>
+    <div id="chatPrivateBar">
+      <select id="privateTarget" onchange="window.__chatChangePrivateTarget()">
+        <option value="">选择好友...</option>
+      </select>
+    </div>
+    <div id="chatMessages"></div>
+    <div id="chatInputArea">
+      <input id="chatInput" type="text" placeholder="输入消息..." maxlength="500" />
+      <button id="chatSendBtn" onclick="window.__chatSend()">发送</button>
+    </div>
+  </div>
+</div>
+
+<!-- 好友面板 -->
+<div id="friendPanel" style="display:none">
+  <div id="friendToggle" onclick="window.__friendToggle()">
+    <span>👥 好友 <span class="badge" id="friendBadge">0</span></span>
+    <span id="friendArrow">▼</span>
+  </div>
+  <div id="friendBody">
+    <div class="friend-tabs">
+      <button id="friendListTab" class="active" onclick="window.__friendSwitchTab('list')">好友列表</button>
+      <button id="friendReqTab" onclick="window.__friendSwitchTab('requests')">申请 <span id="reqCount" style="color:#ffd54f"></span></button>
+    </div>
+    <div id="friendSearchArea">
+      <input id="friendSearchInput" type="text" placeholder="搜索昵称添加好友..." maxlength="30" />
+    </div>
+    <div id="friendList"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ===== 配置 =====
+  // 聊天服务器地址（优先读取 localStorage，其次使用游戏服务器地址）
+  const DEFAULT_CHAT_SERVER = (location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'http://localhost:3000' : location.origin;
+  const SERVER_URL = window.__CHAT_SERVER__ || localStorage.getItem('football_chat_server_url') || DEFAULT_CHAT_SERVER;
+
+  // ===== 状态 =====
+  let socket = null;
+  let myUserId = null;
+  let myNickname = '';
+  let isAuthenticated = false;
+  let isGuest = false;
+  let chatTab = 'world'; // 'world' | 'private'
+  let privateTargetId = null;
+  let friendTab = 'list'; // 'list' | 'requests'
+  let friends = []; // [{userId, nickname, avatar, online}]
+  let pendingRequests = []; // [{fromUserId, fromNickname, message, requestId}]
+  let chatCollapsed = false;
+  let friendCollapsed = false;
+  let unreadChat = 0;
+  let searchResults = [];
+
+  // ===== Socket 连接 =====
+  function connectSocket() {
+    if (socket) socket.disconnect();
+    try {
+      socket = io(SERVER_URL, { transports: ['websocket', 'polling'], reconnection: true, reconnectionDelay: 2000 });
+    } catch(e) {
+      updateConnStatus('disconnected');
+      return;
+    }
+
+    socket.on('connect', () => { updateConnStatus('connected'); });
+    socket.on('disconnect', () => { updateConnStatus('disconnected'); });
+    socket.on('connect_error', () => { updateConnStatus('disconnected'); });
+
+    // 认证
+    socket.on('auth_success', (data) => {
+      myUserId = data.userId;
+      myNickname = data.nickname;
+      isAuthenticated = true;
+      isGuest = false;
+      document.getElementById('loginOverlay').classList.add('hidden');
+      document.getElementById('chatPanel').style.display = '';
+      document.getElementById('friendPanel').style.display = '';
+      document.getElementById('loginError').textContent = '';
+      document.getElementById('loginStatus').textContent = '';
+      addSystemMessage('已登录为 ' + data.nickname);
+      socket.emit('get_friends_list');
+    });
+
+    socket.on('auth_error', (data) => {
+      document.getElementById('loginError').textContent = data.message || '认证失败';
+      document.getElementById('loginStatus').textContent = '';
+    });
+
+    // 注册结果
+    socket.on('register_success', (data) => {
+      document.getElementById('loginStatus').textContent = '注册成功，正在登录...';
+      document.getElementById('loginError').textContent = '';
+    });
+
+    socket.on('register_error', (data) => {
+      document.getElementById('loginError').textContent = data.message || '注册失败';
+      document.getElementById('loginStatus').textContent = '';
+      // 注册验证码发送失败时恢复按钮
+      var regBtn = document.getElementById('regVerifyBtn');
+      if (regBtn && regCountdown > 0) {
+        regBtn.disabled = false;
+        regBtn.textContent = '获取验证码';
+        if (regTimer) clearInterval(regTimer);
+        regCountdown = 0;
+      }
+    });
+
+    // 注册验证码已发送
+    socket.on('register_code_sent', (data) => {
+      document.getElementById('loginStatus').textContent = '验证码已发送至 ' + (data.email || '您的邮箱');
+      document.getElementById('loginError').textContent = '';
+    });
+
+    // 发送验证码结果（找回密码）
+    socket.on('verify_code_sent', (data) => {
+      document.getElementById('loginStatus').textContent = '验证码已发送至 ' + (data.email || '您的邮箱');
+      document.getElementById('loginError').textContent = '';
+    });
+
+    socket.on('verify_code_error', (data) => {
+      document.getElementById('loginError').textContent = data.message || '验证码发送失败';
+      // 恢复按钮
+      var btn = document.getElementById('forgotVerifyBtn');
+      if (btn) { btn.disabled = false; btn.textContent = '获取验证码'; forgotCountdown = 0; }
+    });
+
+    // 重置密码结果
+    socket.on('reset_password_success', () => {
+      document.getElementById('loginStatus').textContent = '密码重置成功，请登录';
+      document.getElementById('loginError').textContent = '';
+      window.__chatSwitchTab('login');
+    });
+
+    socket.on('reset_password_error', (data) => {
+      document.getElementById('loginError').textContent = data.message || '密码重置失败';
+      document.getElementById('loginStatus').textContent = '';
+    });
+
+    // 跳过登录确认
+    socket.on('skip_notified', (data) => {
+      myUserId = data.tempId;
+      myNickname = data.nickname;
+      isAuthenticated = false;
+      isGuest = true;
+      document.getElementById('loginOverlay').classList.add('hidden');
+      document.getElementById('loginStatus').textContent = '';
+      // 游客模式：隐藏聊天和好友面板
+      document.getElementById('chatPanel').style.display = 'none';
+      document.getElementById('friendPanel').style.display = 'none';
+    });
+
+    // 世界聊天
+    socket.on('receive_world_message', (data) => {
+      if (chatTab === 'world') {
+        addChatMessage(data.senderName, data.content, data.timestamp, data.senderId === myUserId);
+      } else {
+        unreadChat++;
+        updateChatBadge();
+      }
+    });
+
+    // 私聊
+    socket.on('receive_private_message', (data) => {
+      if (chatTab === 'private' && privateTargetId === data.senderId) {
+        addChatMessage(data.senderName, data.content, data.timestamp, false, true);
+      } else {
+        unreadChat++;
+        updateChatBadge();
+        addSystemMessage('私聊来自 ' + data.senderName + ': ' + data.content);
+      }
+    });
+
+    // 搜索
+    socket.on('user_found', (data) => {
+      searchResults = [data];
+      renderSearchResult(data);
+    });
+
+    socket.on('user_not_found', () => {
+      searchResults = [];
+      var el = document.getElementById('friendList');
+      el.innerHTML = '<div style="padding:16px;text-align:center;color:rgba(255,255,255,0.4);font-size:12px">未找到该用户</div>';
+    });
+
+    // 好友申请
+    socket.on('receive_friend_request', (data) => {
+      pendingRequests.push(data);
+      showFriendRequestNotif(data);
+      updateReqCount();
+    });
+
+    socket.on('friend_request_accepted', (data) => {
+      friends.push({ userId: data.userId, nickname: data.nickname, avatar: '', online: true });
+      addSystemMessage(data.nickname + ' 通过了你的好友申请！');
+      renderFriends();
+      updatePrivateSelect();
+    });
+
+    socket.on('friend_request_rejected', (data) => {
+      addSystemMessage('对方拒绝了你的好友申请');
+    });
+
+    // 好友列表
+    socket.on('friends_list', (data) => {
+      friends = data || [];
+      renderFriends();
+      updatePrivateSelect();
+    });
+
+    // 在线状态
+    socket.on('online_users', (users) => {
+      var onlineIds = new Set(users.map(u => u.userId));
+      friends.forEach(f => { f.online = onlineIds.has(f.userId); });
+      renderFriends();
+      updatePrivateSelect();
+    });
+
+    socket.on('user_online', (data) => {
+      var f = friends.find(f => f.userId === data.userId);
+      if (f) { f.online = true; renderFriends(); updatePrivateSelect(); }
+    });
+
+    socket.on('user_offline', (data) => {
+      var f = friends.find(f => f.userId === data.userId);
+      if (f) { f.online = false; renderFriends(); updatePrivateSelect(); }
+    });
+  }
+
+  // ===== 连接状态 =====
+  function updateConnStatus(status) {
+    var el = document.getElementById('connStatus');
+    if (status === 'connected') {
+      el.className = 'connected';
+      el.textContent = '● 已连接';
+    } else {
+      el.className = 'disconnected';
+      el.textContent = '○ 未连接';
+    }
+  }
+
+  // ===== 登录/注册 =====
+  window.__chatSwitchTab = function(tab) {
+    document.getElementById('loginTab').classList.toggle('active', tab === 'login');
+    document.getElementById('registerTab').classList.toggle('active', tab === 'register');
+    document.getElementById('loginForm').style.display = tab === 'login' ? '' : 'none';
+    document.getElementById('registerForm').style.display = tab === 'register' ? '' : 'none';
+    document.getElementById('forgotForm').style.display = 'none';
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('loginStatus').textContent = '';
+    // 重置注册验证码按钮
+    var regBtn = document.getElementById('regVerifyBtn');
+    if (regBtn) {
+      regBtn.disabled = false;
+      regBtn.textContent = '获取验证码';
+    }
+    if (regTimer) { clearInterval(regTimer); regTimer = null; }
+    regCountdown = 0;
+    var regCodeInput = document.getElementById('regCode');
+    if (regCodeInput) regCodeInput.value = '';
+  };
+
+  // 显示找回密码面板
+  window.__chatShowForgot = function() {
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('registerForm').style.display = 'none';
+    document.getElementById('forgotForm').style.display = '';
+    document.getElementById('loginTab').classList.remove('active');
+    document.getElementById('registerTab').classList.remove('active');
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('loginStatus').textContent = '';
+  };
+
+  window.__chatLogin = function() {
+    var n = document.getElementById('loginNick').value.trim();
+    var p = document.getElementById('loginPass').value;
+    if (!n || !p) { document.getElementById('loginError').textContent = '请填写昵称和密码'; return; }
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('loginStatus').textContent = '登录中...';
+    if (!socket || !socket.connected) connectSocket();
+    setTimeout(function() {
+      if (socket && socket.connected) {
+        socket.emit('login', { nickname: n, password: p });
+      } else {
+        document.getElementById('loginError').textContent = '无法连接服务器';
+        document.getElementById('loginStatus').textContent = '';
+      }
+    }, 500);
+  };
+
+  window.__chatRegister = function() {
+    var n = document.getElementById('regNick').value.trim();
+    var p = document.getElementById('regPass').value;
+    var e = document.getElementById('regEmail').value.trim();
+    var c = document.getElementById('regCode').value.trim();
+    if (!n || !p || !e || !c) { document.getElementById('loginError').textContent = '请填写所有字段'; return; }
+    // 简单邮箱格式校验
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+      document.getElementById('loginError').textContent = '请输入有效的邮箱地址';
+      return;
+    }
+    if (c.length !== 6 || !/^\d{6}$/.test(c)) {
+      document.getElementById('loginError').textContent = '请输入6位数字验证码';
+      return;
+    }
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('loginStatus').textContent = '注册中...';
+    if (!socket || !socket.connected) connectSocket();
+    setTimeout(function() {
+      if (socket && socket.connected) {
+        socket.emit('register', { nickname: n, password: p, email: e, code: c });
+      } else {
+        document.getElementById('loginError').textContent = '无法连接服务器';
+        document.getElementById('loginStatus').textContent = '';
+      }
+    }, 500);
+  };
+
+  // 发送注册验证码
+  var regCountdown = 0;
+  var regTimer = null;
+  window.__chatSendRegCode = function() {
+    var n = document.getElementById('regNick').value.trim();
+    var p = document.getElementById('regPass').value;
+    var e = document.getElementById('regEmail').value.trim();
+    if (!n || !p || !e) { document.getElementById('loginError').textContent = '请先填写昵称、密码和邮箱'; return; }
+    if (n.length < 2 || n.length > 20) {
+      document.getElementById('loginError').textContent = '昵称长度需在2-20个字符之间';
+      return;
+    }
+    if (p.length < 6) {
+      document.getElementById('loginError').textContent = '密码长度至少6位';
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+      document.getElementById('loginError').textContent = '请输入有效的邮箱地址';
+      return;
+    }
+    document.getElementById('loginError').textContent = '';
+    if (!socket || !socket.connected) connectSocket();
+    setTimeout(function() {
+      if (socket && socket.connected) {
+        socket.emit('send_register_code', { nickname: n, password: p, email: e });
+        // 启动倒计时
+        var btn = document.getElementById('regVerifyBtn');
+        btn.disabled = true;
+        regCountdown = 60;
+        btn.textContent = regCountdown + 's 后重发';
+        if (regTimer) clearInterval(regTimer);
+        regTimer = setInterval(function() {
+          regCountdown--;
+          if (regCountdown <= 0) {
+            clearInterval(regTimer);
+            btn.disabled = false;
+            btn.textContent = '获取验证码';
+          } else {
+            btn.textContent = regCountdown + 's 后重发';
+          }
+        }, 1000);
+      } else {
+        document.getElementById('loginError').textContent = '无法连接服务器';
+      }
+    }, 300);
+  };
+
+  window.__chatSkip = function() {
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('loginStatus').textContent = '进入游客模式...';
+    if (!socket || !socket.connected) connectSocket();
+    // 生成临时ID和昵称
+    var tempId = 'guest_' + Math.random().toString(36).substring(2, 10);
+    var tempName = '游客_' + Math.floor(Math.random() * 9000 + 1000);
+    setTimeout(function() {
+      if (socket && socket.connected) {
+        socket.emit('skip_login', { tempId: tempId, nickname: tempName });
+      } else {
+        // 即使连接失败也让玩家进入游戏
+        myUserId = tempId;
+        myNickname = tempName;
+        isAuthenticated = false;
+        isGuest = true;
+        document.getElementById('loginOverlay').classList.add('hidden');
+        document.getElementById('chatPanel').style.display = 'none';
+        document.getElementById('friendPanel').style.display = 'none';
+        document.getElementById('loginStatus').textContent = '';
+      }
+    }, 300);
+  };
+
+  // 发送忘记密码验证码
+  var forgotCountdown = 0;
+  var forgotTimer = null;
+  window.__chatSendForgotCode = function() {
+    var email = document.getElementById('forgotEmail').value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      document.getElementById('loginError').textContent = '请输入有效的邮箱地址';
+      return;
+    }
+    document.getElementById('loginError').textContent = '';
+    if (!socket || !socket.connected) connectSocket();
+    setTimeout(function() {
+      if (socket && socket.connected) {
+        socket.emit('send_reset_code', { email: email });
+        // 启动倒计时
+        var btn = document.getElementById('forgotVerifyBtn');
+        btn.disabled = true;
+        forgotCountdown = 60;
+        btn.textContent = forgotCountdown + 's 后重发';
+        if (forgotTimer) clearInterval(forgotTimer);
+        forgotTimer = setInterval(function() {
+          forgotCountdown--;
+          if (forgotCountdown <= 0) {
+            clearInterval(forgotTimer);
+            btn.disabled = false;
+            btn.textContent = '获取验证码';
+          } else {
+            btn.textContent = forgotCountdown + 's 后重发';
+          }
+        }, 1000);
+      } else {
+        document.getElementById('loginError').textContent = '无法连接服务器';
+      }
+    }, 300);
+  };
+
+  // 重置密码
+  window.__chatResetPassword = function() {
+    var email = document.getElementById('forgotEmail').value.trim();
+    var code = document.getElementById('forgotCode').value.trim();
+    var newPass = document.getElementById('forgotNewPass').value;
+    if (!email || !code || !newPass) {
+      document.getElementById('loginError').textContent = '请填写所有字段';
+      return;
+    }
+    if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+      document.getElementById('loginError').textContent = '请输入6位数字验证码';
+      return;
+    }
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('loginStatus').textContent = '重置中...';
+    if (!socket || !socket.connected) connectSocket();
+    setTimeout(function() {
+      if (socket && socket.connected) {
+        socket.emit('reset_password', { email: email, code: code, newPassword: newPass });
+      } else {
+        document.getElementById('loginError').textContent = '无法连接服务器';
+        document.getElementById('loginStatus').textContent = '';
+      }
+    }, 300);
+  };
+
+  // ===== 聊天面板 =====
+  window.__chatToggle = function() {
+    chatCollapsed = !chatCollapsed;
+    document.getElementById('chatPanel').classList.toggle('collapsed', chatCollapsed);
+    document.getElementById('chatArrow').textContent = chatCollapsed ? '▲' : '▼';
+  };
+
+  window.__chatSwitchChat = function(tab) {
+    chatTab = tab;
+    document.getElementById('worldTab').classList.toggle('active', tab === 'world');
+    document.getElementById('privateTab').classList.toggle('active', tab === 'private');
+    document.getElementById('chatPrivateBar').style.display = tab === 'private' ? '' : 'none';
+    document.getElementById('chatMessages').innerHTML = '';
+    if (tab === 'world') unreadChat = 0;
+    updateChatBadge();
+  };
+
+  function updateChatBadge() {
+    var el = document.getElementById('chatBadge');
+    if (unreadChat > 0) { el.style.display = ''; el.textContent = unreadChat > 99 ? '99+' : unreadChat; }
+    else { el.style.display = 'none'; }
+  }
+
+  function addChatMessage(sender, content, timestamp, isSelf, isPrivate) {
+    var container = document.getElementById('chatMessages');
+    var div = document.createElement('div');
+    div.className = 'chat-msg';
+    var time = '';
+    if (timestamp) {
+      var d = new Date(timestamp);
+      time = '<span class="time">' + d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0') + '</span>';
+    }
+    div.innerHTML = '<span class="sender ' + (isSelf ? 'self' : 'other') + '">' + escapeHtml(sender) + '</span> ' + escapeHtml(content) + time;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    // 限制消息数量
+    while (container.children.length > 200) container.removeChild(container.firstChild);
+  }
+
+  function addSystemMessage(text) {
+    var container = document.getElementById('chatMessages');
+    var div = document.createElement('div');
+    div.className = 'chat-msg system';
+    div.textContent = '— ' + text + ' —';
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  window.__chatSend = function() {
+    var input = document.getElementById('chatInput');
+    var content = input.value.trim();
+    if (!content) return;
+    if (isGuest) { addSystemMessage('游客模式无法聊天，请登录后使用'); return; }
+    if (!isAuthenticated || !socket || !socket.connected) { addSystemMessage('请先登录'); return; }
+
+    if (chatTab === 'world') {
+      socket.emit('send_world_message', { content: content });
+      addChatMessage(myNickname, content, Date.now(), true);
+    } else if (chatTab === 'private' && privateTargetId) {
+      socket.emit('send_private_message', { receiverId: privateTargetId, content: content });
+      var target = friends.find(function(f) { return f.userId === privateTargetId; });
+      addChatMessage('我 → ' + (target ? target.nickname : '对方'), content, Date.now(), true, true);
+    } else if (chatTab === 'private' && !privateTargetId) {
+      addSystemMessage('请先选择一个好友');
+    }
+    input.value = '';
+  };
+
+  window.__chatChangePrivateTarget = function() {
+    privateTargetId = document.getElementById('privateTarget').value || null;
+    document.getElementById('chatMessages').innerHTML = '';
+    if (privateTargetId) {
+      var target = friends.find(function(f) { return f.userId === privateTargetId; });
+      addSystemMessage('正在与 ' + (target ? target.nickname : '对方') + ' 私聊');
+    }
+  };
+
+  // 回车发送
+  document.getElementById('chatInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); window.__chatSend(); }
+    e.stopPropagation(); // 阻止触发游戏按键
+  });
+
+  // ===== 好友面板 =====
+  window.__friendToggle = function() {
+    friendCollapsed = !friendCollapsed;
+    document.getElementById('friendPanel').classList.toggle('collapsed', friendCollapsed);
+    document.getElementById('friendArrow').textContent = friendCollapsed ? '▲' : '▼';
+  };
+
+  window.__friendSwitchTab = function(tab) {
+    friendTab = tab;
+    document.getElementById('friendListTab').classList.toggle('active', tab === 'list');
+    document.getElementById('friendReqTab').classList.toggle('active', tab === 'requests');
+    if (tab === 'list') renderFriends();
+    else renderRequests();
+  };
+
+  function renderFriends() {
+    var el = document.getElementById('friendList');
+    if (friends.length === 0) {
+      el.innerHTML = '<div style="padding:20px;text-align:center;color:rgba(255,255,255,0.3);font-size:12px">暂无好友<br><span style="font-size:11px">在上方搜索昵称添加</span></div>';
+      return;
+    }
+    var html = '';
+    // 在线排前
+    var sorted = friends.slice().sort(function(a, b) { return (b.online ? 1 : 0) - (a.online ? 1 : 0); });
+    sorted.forEach(function(f) {
+      html += '<div class="friend-item">' +
+        '<span class="friend-dot ' + (f.online ? 'online' : 'offline') + '"></span>' +
+        '<span class="friend-nick">' + escapeHtml(f.nickname) + '</span>' +
+        '<div class="friend-actions">' +
+          '<button class="btn-msg" onclick="window.__friendMsg(' + f.userId + ')">聊</button>' +
+          '<button class="btn-remove" onclick="window.__friendRemove(' + f.userId + ')">✕</button>' +
+        '</div></div>';
+    });
+    el.innerHTML = html;
+  }
+
+  function renderRequests() {
+    var el = document.getElementById('friendList');
+    if (pendingRequests.length === 0) {
+      el.innerHTML = '<div style="padding:20px;text-align:center;color:rgba(255,255,255,0.3);font-size:12px">暂无好友申请</div>';
+      return;
+    }
+    var html = '';
+    pendingRequests.forEach(function(r) {
+      html += '<div class="friend-item" style="flex-direction:column;align-items:stretch;gap:6px">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span class="friend-nick" style="color:#ffd54f">' + escapeHtml(r.fromNickname) + '</span>' +
+        '</div>' +
+        (r.message ? '<div style="color:rgba(255,255,255,0.4);font-size:11px;padding-left:16px">"' + escapeHtml(r.message) + '"</div>' : '') +
+        '<div class="friend-actions" style="justify-content:flex-end">' +
+          '<button class="btn-accept" onclick="window.__friendAccept(' + r.requestId + ')">同意</button>' +
+          '<button class="btn-reject" onclick="window.__friendReject(' + r.requestId + ')">拒绝</button>' +
+        '</div></div>';
+    });
+    el.innerHTML = html;
+  }
+
+  function renderSearchResult(data) {
+    var el = document.getElementById('friendList');
+    var isSelf = data.userId === myUserId;
+    var isFriend = friends.some(function(f) { return f.userId === data.userId; });
+    var html = '<div class="search-result">' +
+      '<span class="nick">' + escapeHtml(data.nickname) + '</span>';
+    if (isSelf) {
+      html += '<span style="color:rgba(255,255,255,0.3);font-size:11px">这是你</span>';
+    } else if (isFriend) {
+      html += '<span style="color:#66bb6a;font-size:11px">已是好友</span>';
+    } else {
+      html += '<button class="btn-add" onclick="window.__friendAdd(' + data.userId + ')">添加</button>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  }
+
+  function updateReqCount() {
+    var el = document.getElementById('reqCount');
+    var badge = document.getElementById('friendBadge');
+    if (pendingRequests.length > 0) {
+      el.textContent = '(' + pendingRequests.length + ')';
+      badge.style.display = '';
+      badge.textContent = pendingRequests.length;
+    } else {
+      el.textContent = '';
+      badge.style.display = 'none';
+    }
+  }
+
+  function updatePrivateSelect() {
+    var sel = document.getElementById('privateTarget');
+    var current = sel.value;
+    sel.innerHTML = '<option value="">选择好友...</option>';
+    friends.forEach(function(f) {
+      var opt = document.createElement('option');
+      opt.value = f.userId;
+      opt.textContent = f.nickname + (f.online ? ' (在线)' : '');
+      sel.appendChild(opt);
+    });
+    if (current) sel.value = current;
+  }
+
+  // 搜索
+  var searchTimer = null;
+  document.getElementById('friendSearchInput').addEventListener('input', function(e) {
+    e.stopPropagation();
+    clearTimeout(searchTimer);
+    var val = this.value.trim();
+    if (!val) { if (friendTab === 'list') renderFriends(); else renderRequests(); return; }
+    searchTimer = setTimeout(function() {
+      if (isGuest) return;
+      if (!isAuthenticated || !socket || !socket.connected) return;
+      socket.emit('search_user', { nickname: val });
+    }, 400);
+  });
+  document.getElementById('friendSearchInput').addEventListener('keydown', function(e) { e.stopPropagation(); });
+
+  window.__friendAdd = function(targetUserId) {
+    if (!socket || !socket.connected) return;
+    var msg = prompt('发送好友申请（验证消息）：') || '';
+    socket.emit('send_friend_request', { targetUserId: targetUserId, message: msg });
+    addSystemMessage('已发送好友申请');
+    document.getElementById('friendSearchInput').value = '';
+    if (friendTab === 'list') renderFriends();
+  };
+
+  window.__friendAccept = function(requestId) {
+    if (!socket || !socket.connected) return;
+    socket.emit('accept_friend', { requestId: requestId });
+    pendingRequests = pendingRequests.filter(function(r) { return r.requestId !== requestId; });
+    updateReqCount();
+    if (friendTab === 'requests') renderRequests();
+  };
+
+  window.__friendReject = function(requestId) {
+    if (!socket || !socket.connected) return;
+    socket.emit('reject_friend', { requestId: requestId });
+    pendingRequests = pendingRequests.filter(function(r) { return r.requestId !== requestId; });
+    updateReqCount();
+    if (friendTab === 'requests') renderRequests();
+  };
+
+  window.__friendRemove = function(friendId) {
+    if (!confirm('确定删除该好友？')) return;
+    if (!socket || !socket.connected) return;
+    socket.emit('remove_friend', { friendId: friendId });
+    friends = friends.filter(function(f) { return f.userId !== friendId; });
+    renderFriends();
+    updatePrivateSelect();
+  };
+
+  window.__friendMsg = function(userId) {
+    // 切换到私聊标签并选择该好友
+    chatCollapsed = false;
+    document.getElementById('chatPanel').classList.remove('collapsed');
+    document.getElementById('chatArrow').textContent = '▼';
+    window.__chatSwitchChat('private');
+    document.getElementById('privateTarget').value = userId;
+    window.__chatChangePrivateTarget();
+  };
+
+  function showFriendRequestNotif(data) {
+    var popup = document.getElementById('friendNotifPopup');
+    popup.classList.add('show');
+    var card = document.createElement('div');
+    card.className = 'friend-notif-card';
+    card.innerHTML = '<div class="notif-title">新好友申请</div>' +
+      '<div class="notif-nick">' + escapeHtml(data.fromNickname) + '</div>' +
+      (data.message ? '<div class="notif-msg">"' + escapeHtml(data.message) + '"</div>' : '') +
+      '<div class="notif-btns">' +
+        '<button class="btn-accept" data-rid="' + data.requestId + '">同意</button>' +
+        '<button class="btn-reject" data-rid="' + data.requestId + '">拒绝</button>' +
+      '</div>';
+    card.querySelector('.btn-accept').addEventListener('click', function() { window.__friendAccept(this.dataset.rid); card.remove(); if (!popup.children.length) popup.classList.remove('show'); });
+    card.querySelector('.btn-reject').addEventListener('click', function() { window.__friendReject(this.dataset.rid); card.remove(); if (!popup.children.length) popup.classList.remove('show'); });
+    popup.appendChild(card);
+    // 自动消失
+    setTimeout(function() { card.remove(); if (!popup.children.length) popup.classList.remove('show'); }, 15000);
+  }
+
+  // ===== 工具 =====
+  function escapeHtml(str) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(str));
+    return d.innerHTML;
+  }
+
+  // ===== 初始化 =====
+  connectSocket();
+
+  // 暴露给外部
+  window.__chatSocket = function() { return socket; };
+  window.__chatState = function() { return { myUserId: myUserId, myNickname: myNickname, isAuthenticated: isAuthenticated, isGuest: isGuest }; };
+
+})();
+</script>
+
+</body>
+</html>
