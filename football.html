@@ -1759,7 +1759,7 @@ function connectSocket() {
     gameState.started = true;
     document.getElementById('multiplayerPanel').style.display = 'none';
     if (!audioCtx) { initAudio(); }
-    bgMusicOn = true;
+    bgMusicOn = soundEnabled;
   });
   socket.on('playerDisconnected', (disconnectedId) => {
     const wasHost = mpMode === 'host';
@@ -2148,7 +2148,7 @@ document.getElementById('btnConfirm').onclick = () => {
       gameState.started = true;
       mpPanel.style.display = 'none';
       if (!audioCtx) { initAudio(); }
-      bgMusicOn = true;
+      bgMusicOn = soundEnabled;
     } else {
       roomStatus.textContent = '等待另一名玩家加入...';
     }
@@ -2171,7 +2171,7 @@ document.getElementById('btnConfirm').onclick = () => {
     gameState.started = true;
     mpPanel.style.display = 'none';
     if (!audioCtx) { initAudio(); }
-    bgMusicOn = true;
+    bgMusicOn = soundEnabled;
   } else if (pendingAction === 'create') {
     if (!socket) connectSocket();
     if (!socket.connected) {
@@ -2191,9 +2191,10 @@ document.getElementById('btnConfirm').onclick = () => {
 
 // ===== 音效 =====
 let audioCtx;
+let soundEnabled = localStorage.getItem('football_sound') !== 'false'; // 默认开启
 function initAudio() { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
 function playTone(freq, dur, type = 'sine', vol = 0.15) {
-  if (!audioCtx) return;
+  if (!audioCtx || !soundEnabled) return;
   const o = audioCtx.createOscillator(), g = audioCtx.createGain();
   o.type = type; o.frequency.value = freq; g.gain.setValueAtTime(vol, audioCtx.currentTime);
   g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
@@ -2242,16 +2243,23 @@ function updateBGMusic(dt) {
   }
 }
 
-// ===== 音乐开关按钮 =====
+// ===== 音乐开关按钮（控制所有音效+背景音乐）=====
 const musicBtn = document.getElementById('musicBtn');
 const musicIcon = document.getElementById('musicIcon');
-// 默认开启音乐（进入游戏时由 initAudio 触发）
+// 根据保存的状态初始化按钮外观
+if (!soundEnabled) {
+  musicIcon.textContent = '🔇';
+  musicBtn.classList.add('muted');
+  bgMusicOn = false;
+}
 musicBtn.addEventListener('click', () => {
   // 确保音频上下文已初始化
   if (!audioCtx) { initAudio(); }
   if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume(); }
-  bgMusicOn = !bgMusicOn;
-  if (bgMusicOn) {
+  soundEnabled = !soundEnabled;
+  bgMusicOn = soundEnabled; // 背景音乐跟随总开关
+  localStorage.setItem('football_sound', soundEnabled);
+  if (soundEnabled) {
     musicIcon.textContent = '🎵';
     musicBtn.classList.remove('muted');
     // 重置节拍指针让音乐从头开始
