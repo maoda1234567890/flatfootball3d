@@ -1,13 +1,17 @@
 {
   "name": "flatfootball3d-server",
   "version": "1.0.0",
-  "description": "躺平足球3D 双人联机服务器",
+  "description": "躺平足球3D - 多人联机游戏服务器（房间管理 + 昵称密码认证 + 忘记密码 + 聊天好友系统）",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.19.2",
-    "socket.io": "^4.7.5"
+    "socket.io": "^4.7.5",
+    "nodemailer": "^6.9.0"
+  },
+  "engines": {
+    "node": ">=16"
   }
 }
